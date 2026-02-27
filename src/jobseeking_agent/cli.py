@@ -299,9 +299,82 @@ def apply() -> None:
     console.print(f"[dim]Application ID: {application.id}[/dim]")
 
 
+def advisor() -> None:
+    from jobseeking_agent.agents.advisor import AdvisorAgent
+    from jobseeking_agent.db import get_session, init_db
+    from jobseeking_agent.models.application import Application
+    from jobseeking_agent.models.job import Job
+    from jobseeking_agent.models.user_profile import UserProfile
+    from sqlmodel import select
+
+    init_db()
+
+    try:
+        profile = UserProfile.load()
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        sys.exit(1)
+
+    with get_session() as session:
+        jobs = session.exec(select(Job)).all()
+        applications = session.exec(select(Application)).all()
+
+    if not jobs:
+        console.print("[yellow]No jobs in DB yet. Run scout first.[/yellow]")
+        sys.exit(0)
+
+    console.print(Panel(
+        f"[bold]Advisor Agent[/bold] — analysing {len(jobs)} jobs, {len(applications)} applications",
+        style="blue",
+    ))
+
+    with console.status("[bold green]Generating report...[/bold green]"):
+        agent = AdvisorAgent()
+        report = agent.run(jobs, applications, profile)
+
+    # Application stats
+    stats = report.app_stats
+    stats_table = Table(title="Application Stats", show_header=False)
+    stats_table.add_column(style="dim")
+    stats_table.add_column()
+    stats_table.add_row("Jobs analysed", str(report.total_jobs_analysed))
+    stats_table.add_row("Applied", str(stats["applied"]))
+    stats_table.add_row("Responded", str(stats["responded"]))
+    stats_table.add_row("Interviews", str(stats["interviews"]))
+    stats_table.add_row("Response rate", stats["response_rate"])
+    console.print(stats_table)
+
+    # Skill gap table
+    gap_table = Table(title="Top Missing Skills (from JDs)", show_header=True)
+    gap_table.add_column("Skill")
+    gap_table.add_column("Frequency", justify="right")
+    for item in report.top_missing_skills[:10]:
+        gap_table.add_row(item["skill"], str(item["count"]))
+    console.print(gap_table)
+
+    # In-demand skills user has
+    present_table = Table(title="Your Skills in Demand", show_header=True, style="green")
+    present_table.add_column("Skill")
+    present_table.add_column("Frequency", justify="right")
+    for item in report.top_present_skills[:8]:
+        present_table.add_row(item["skill"], str(item["count"]))
+    console.print(present_table)
+
+    console.print(Panel(report.market_summary, title="Market Summary", style="blue"))
+    console.print(Panel(report.skill_gap_analysis, title="Skill Gap Analysis"))
+
+    actions_table = Table(title="Recommended Actions", show_header=False, style="yellow")
+    actions_table.add_column()
+    for i, action in enumerate(report.recommended_actions, 1):
+        actions_table.add_row(f"{i}. {action}")
+    console.print(actions_table)
+
+    console.print(f"\n[dim]Report saved to data/reports/[/dim]")
+
+
 if __name__ == "__main__":
-    commands = {"scout": scout, "tailor": tailor, "apply": apply}
+    commands = {"scout": scout, "tailor": tailor, "apply": apply, "advisor": advisor}
     if len(sys.argv) > 1 and sys.argv[1] in commands:
         commands[sys.argv[1]]()
     else:
-        console.print("Usage: python -m jobseeking_agent.cli [scout|tailor|apply]")
+        console.print("Usage: python -m jobseeking_agent.cli [scout|tailor|apply|advisor]")
