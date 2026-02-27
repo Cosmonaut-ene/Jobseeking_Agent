@@ -3,6 +3,7 @@ CLI entry point.
 Usage:
     python -m jobseeking_agent.cli scout
     python -m jobseeking_agent.cli tailor
+    python -m jobseeking_agent.cli apply
 """
 
 import sys
@@ -189,9 +190,118 @@ def _display_scout_result(job) -> None:
     console.print(f"\n[dim]Job ID: {job.id}[/dim]")
 
 
+def apply() -> None:
+    from jobseeking_agent.agents.applier import ApplierAgent
+    from jobseeking_agent.db import get_session, init_db
+    from jobseeking_agent.models.application import ApplicationChannel
+    from jobseeking_agent.models.job import Job, JobStatus
+    from jobseeking_agent.models.resume_version import ResumeVersion
+    from jobseeking_agent.models.user_profile import UserProfile
+    from sqlmodel import select
+
+    init_db()
+
+    try:
+        profile = UserProfile.load()
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        sys.exit(1)
+
+    # List jobs that have at least one ResumeVersion
+    with get_session() as session:
+        versions = session.exec(select(ResumeVersion)).all()
+        version_by_job: dict[str, ResumeVersion] = {}
+        for v in versions:
+            # Keep the most recent version per job
+            if v.job_id not in version_by_job or v.created_at > version_by_job[v.job_id].created_at:
+                version_by_job[v.job_id] = v
+
+        if not version_by_job:
+            console.print("[yellow]No tailored resumes found. Run tailor first.[/yellow]")
+            sys.exit(0)
+
+        jobs = session.exec(
+            select(Job).where(Job.id.in_(list(version_by_job.keys())))
+            .order_by(Job.created_at.desc())
+        ).all()
+
+    table = Table(title="Jobs with Tailored Resumes", show_lines=True)
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Title")
+    table.add_column("Company")
+    table.add_column("Match", justify="right")
+    table.add_column("ATS", justify="right")
+    table.add_column("Status")
+
+    for i, job in enumerate(jobs):
+        v = version_by_job[job.id]
+        score_color = "green" if job.match_score >= 0.75 else "yellow" if job.match_score >= 0.5 else "red"
+        ats_color = "green" if v.ats_score >= 0.7 else "yellow" if v.ats_score >= 0.4 else "red"
+        table.add_row(
+            str(i + 1),
+            job.title or "(untitled)",
+            job.company or "-",
+            f"[{score_color}]{job.match_score:.0%}[/{score_color}]",
+            f"[{ats_color}]{v.ats_score:.0%}[/{ats_color}]",
+            job.status.value,
+        )
+
+    console.print(table)
+
+    choice = Prompt.ask("Select job number", default="1")
+    try:
+        idx = int(choice) - 1
+        selected_job = jobs[idx]
+        selected_version = version_by_job[selected_job.id]
+    except (ValueError, IndexError):
+        console.print("[red]Invalid selection.[/red]")
+        sys.exit(1)
+
+    channel_str = Prompt.ask(
+        "Channel",
+        choices=["email", "easy_apply", "manual"],
+        default="email",
+    )
+    channel = ApplicationChannel(channel_str)
+    notes = Prompt.ask("Notes (optional)", default="")
+
+    if channel == ApplicationChannel.manual:
+        console.print("[dim]Manual channel — skipping cover letter generation.[/dim]")
+    else:
+        console.print(f"\n[bold]Generating cover letter for {selected_job.title} @ {selected_job.company}...[/bold]")
+
+    with console.status("[bold green]Working...[/bold green]"):
+        agent = ApplierAgent()
+        application, cover_path = agent.run(
+            selected_job, selected_version, profile, channel, notes
+        )
+
+    if cover_path:
+        cover_text = open(cover_path, encoding="utf-8").read()
+        console.print(Panel(cover_text, title="Cover Letter", style="blue"))
+        console.print(f"[dim]Saved to: {cover_path}[/dim]\n")
+
+    if not Confirm.ask("Confirm application and save record?"):
+        console.print("[dim]Cancelled.[/dim]")
+        sys.exit(0)
+
+    with get_session() as session:
+        # Update job status to applied
+        job_in_db = session.get(Job, selected_job.id)
+        job_in_db.status = JobStatus.applied
+        session.add(job_in_db)
+        session.add(application)
+        session.commit()
+        session.refresh(application)
+
+    console.print(f"[green]Application recorded.[/green]")
+    console.print(f"Follow-up reminder: [bold]{application.follow_up_date}[/bold]")
+    console.print(f"[dim]Application ID: {application.id}[/dim]")
+
+
 if __name__ == "__main__":
-    commands = {"scout": scout, "tailor": tailor}
+    commands = {"scout": scout, "tailor": tailor, "apply": apply}
     if len(sys.argv) > 1 and sys.argv[1] in commands:
         commands[sys.argv[1]]()
     else:
-        console.print("Usage: python -m jobseeking_agent.cli [scout|tailor]")
+        console.print("Usage: python -m jobseeking_agent.cli [scout|tailor|apply]")
