@@ -9,6 +9,7 @@ from sqlmodel import JSON, Column, Field, SQLModel
 class JobStatus(str, Enum):
     new = "new"
     reviewed = "reviewed"
+    dismissed = "dismissed"
     applied = "applied"
     interview = "interview"
     rejected = "rejected"

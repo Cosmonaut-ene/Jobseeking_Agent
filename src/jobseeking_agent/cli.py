@@ -372,9 +372,29 @@ def advisor() -> None:
     console.print(f"\n[dim]Report saved to data/reports/[/dim]")
 
 
+def run() -> None:
+    from jobseeking_agent.db import init_db
+    from jobseeking_agent.orchestrator import Orchestrator
+
+    init_db()
+    Orchestrator().run()
+
+
+def schedule() -> None:
+    from jobseeking_agent.scheduler import start
+    start()
+
+
 if __name__ == "__main__":
-    commands = {"scout": scout, "tailor": tailor, "apply": apply, "advisor": advisor}
+    commands = {
+        "scout": scout,
+        "tailor": tailor,
+        "apply": apply,
+        "advisor": advisor,
+        "run": run,
+        "schedule": schedule,
+    }
     if len(sys.argv) > 1 and sys.argv[1] in commands:
         commands[sys.argv[1]]()
     else:
-        console.print("Usage: python -m jobseeking_agent.cli [scout|tailor|apply|advisor]")
+        console.print("Usage: python -m jobseeking_agent.cli [scout|tailor|apply|advisor|run|schedule]")
