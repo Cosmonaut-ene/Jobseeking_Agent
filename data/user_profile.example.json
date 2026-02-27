@@ -1,0 +1,49 @@
+{
+  "name": "Your Name",
+  "target_roles": ["AI Engineer", "ML Engineer", "Backend Developer"],
+  "skills": [
+    {"name": "Python", "level": "expert", "years": 5},
+    {"name": "PyTorch", "level": "intermediate", "years": 2},
+    {"name": "FastAPI", "level": "expert", "years": 3},
+    {"name": "PostgreSQL", "level": "intermediate", "years": 3},
+    {"name": "Docker", "level": "intermediate", "years": 2}
+  ],
+  "experience": [
+    {
+      "company": "Example Corp",
+      "role": "Backend Engineer",
+      "duration": "2022-01 ~ 2024-06",
+      "bullets": [
+        {
+          "raw": "Designed and built a real-time data pipeline processing 10M events/day using Kafka and Python",
+          "tech": ["Kafka", "Python"],
+          "metric": "10M events/day"
+        },
+        {
+          "raw": "Reduced API response time by 40% by introducing Redis caching layer",
+          "tech": ["Redis"],
+          "metric": "40% latency reduction"
+        }
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "Personal RAG System",
+      "description": "Built a retrieval-augmented generation system for personal knowledge base using LangChain and FAISS",
+      "tech_stack": ["Python", "LangChain", "FAISS", "OpenAI API"],
+      "bullets": [
+        {
+          "raw": "Implemented hybrid search (BM25 + dense retrieval) improving answer relevance by 25%",
+          "tech": ["FAISS", "BM25"],
+          "metric": "25% relevance improvement"
+        }
+      ]
+    }
+  ],
+  "preferences": {
+    "locations": ["Melbourne", "Remote", "Sydney"],
+    "salary_range": {"min": 100000, "max": 140000, "currency": "AUD"},
+    "job_types": ["full-time"]
+  }
+}
