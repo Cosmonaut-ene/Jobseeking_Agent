@@ -1,7 +1,8 @@
 """
 CLI entry point.
 Usage:
-    python -m jobseeking_agent.cli scout
+    python -m jobseeking_agent.cli scout          # 单条 JD 粘贴
+    python -m jobseeking_agent.cli batch-scout    # 批量处理 data/jd_inbox/
     python -m jobseeking_agent.cli tailor
     python -m jobseeking_agent.cli apply
 """
@@ -372,6 +373,133 @@ def advisor() -> None:
     console.print(f"\n[dim]Report saved to data/reports/[/dim]")
 
 
+def _run_scraper_batch(scraped_jobs, source: str, profile, init_db_fn, get_session_fn) -> None:
+    """Shared logic: feed scraped jobs through ScoutAgent and show summary."""
+    from jobseeking_agent.agents.scout import ScoutAgent
+
+    if not scraped_jobs:
+        console.print("[yellow]No new jobs found.[/yellow]")
+        return
+
+    console.print(f"\nFound [bold]{len(scraped_jobs)}[/bold] new jobs. Analysing...\n")
+    agent = ScoutAgent()
+    saved = skipped = failed = 0
+
+    for scraped in scraped_jobs:
+        try:
+            with console.status(f"[green]Scoring: {scraped.title or scraped.url[:60]}[/green]"):
+                job = agent.run(
+                    raw_jd=scraped.raw_jd,
+                    user_profile=profile,
+                    source=source,
+                    source_url=scraped.url,
+                    title=scraped.title,
+                    company=scraped.company,
+                    location=scraped.location,
+                    salary_range=scraped.salary,
+                )
+            score = job.match_score
+            color = "green" if score >= 0.75 else "yellow" if score >= 0.5 else "red"
+            console.print(
+                f"  [{color}]{score:.0%}[/{color}]  {job.title} @ {job.company}"
+            )
+            saved += 1
+        except Exception as e:
+            console.print(f"  [red]Error:[/red] {scraped.url[:60]} — {e}")
+            failed += 1
+
+    console.print(
+        f"\n[green]Saved: {saved}[/green]  "
+        f"[dim]Skipped (dup): {skipped}  Failed: {failed}[/dim]"
+    )
+    console.print("[dim]Run [bold]cli run[/bold] to review new jobs.[/dim]")
+
+
+def seek_scout() -> None:
+    from jobseeking_agent.db import get_session, init_db
+    from jobseeking_agent.models.job import Job
+    from jobseeking_agent.models.user_profile import UserProfile
+    from jobseeking_agent.scrapers.seek import SeekScraper
+    from sqlmodel import select
+
+    init_db()
+
+    try:
+        profile = UserProfile.load()
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        sys.exit(1)
+
+    # Load existing URLs for dedup
+    with get_session() as session:
+        existing_urls = {
+            j.source_url for j in session.exec(select(Job)).all() if j.source_url
+        }
+
+    console.print(Panel(
+        f"[bold]Seek Scout[/bold]\n"
+        f"Roles: {', '.join(profile.target_roles)}\n"
+        f"Locations: {', '.join(profile.preferences.locations)}\n"
+        f"Already in DB: {len(existing_urls)} URLs",
+        style="blue",
+    ))
+
+    max_per = int(Prompt.ask("Max jobs per role/location query", default="15"))
+
+    with console.status("[bold green]Scraping Seek...[/bold green]"):
+        scraper = SeekScraper()
+        scraped = scraper.scrape(
+            target_roles=profile.target_roles,
+            locations=profile.preferences.locations,
+            max_per_query=max_per,
+            existing_urls=existing_urls,
+        )
+
+    _run_scraper_batch(scraped, "seek", profile, init_db, get_session)
+
+
+def linkedin_scout() -> None:
+    from pathlib import Path
+
+    from jobseeking_agent.db import get_session, init_db
+    from jobseeking_agent.models.job import Job
+    from jobseeking_agent.models.user_profile import UserProfile
+    from jobseeking_agent.scrapers.linkedin import URLS_FILE, LinkedInScraper
+    from sqlmodel import select
+
+    init_db()
+
+    try:
+        profile = UserProfile.load()
+    except FileNotFoundError as e:
+        console.print(f"[red]{e}[/red]")
+        sys.exit(1)
+
+    if not URLS_FILE.exists():
+        URLS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        URLS_FILE.write_text(
+            "# Paste LinkedIn job URLs here, one per line\n"
+            "# Example: https://www.linkedin.com/jobs/view/1234567890\n",
+            encoding="utf-8",
+        )
+        console.print(f"[yellow]Created {URLS_FILE}[/yellow]")
+        console.print("Add LinkedIn job URLs (one per line) then re-run this command.")
+        sys.exit(0)
+
+    with get_session() as session:
+        existing_urls = {
+            j.source_url for j in session.exec(select(Job)).all() if j.source_url
+        }
+
+    console.print(Panel("[bold]LinkedIn Scout[/bold] — fetching URLs from data/linkedin_urls.txt", style="blue"))
+
+    with console.status("[bold green]Fetching LinkedIn jobs...[/bold green]"):
+        scraper = LinkedInScraper()
+        scraped = scraper.scrape_from_file(existing_urls=existing_urls)
+
+    _run_scraper_batch(scraped, "linkedin", profile, init_db, get_session)
+
+
 def run() -> None:
     from jobseeking_agent.db import init_db
     from jobseeking_agent.orchestrator import Orchestrator
@@ -388,6 +516,8 @@ def schedule() -> None:
 if __name__ == "__main__":
     commands = {
         "scout": scout,
+        "seek-scout": seek_scout,
+        "linkedin-scout": linkedin_scout,
         "tailor": tailor,
         "apply": apply,
         "advisor": advisor,
@@ -397,4 +527,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] in commands:
         commands[sys.argv[1]]()
     else:
-        console.print("Usage: python -m jobseeking_agent.cli [scout|tailor|apply|advisor|run|schedule]")
+        console.print(
+            "Usage: python -m jobseeking_agent.cli "
+            "[scout|seek-scout|linkedin-scout|tailor|apply|advisor|run|schedule]"
+        )

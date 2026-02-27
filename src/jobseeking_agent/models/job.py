@@ -27,6 +27,7 @@ class Job(SQLModel, table=True):
     skills_required: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     match_score: float = 0.0
     gap_analysis: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    source_url: str = ""   # used for deduplication
     status: JobStatus = JobStatus.new
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

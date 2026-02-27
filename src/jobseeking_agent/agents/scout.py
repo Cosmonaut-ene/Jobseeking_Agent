@@ -60,12 +60,35 @@ class ScoutAgent:
     def __init__(self) -> None:
         self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-    def run(self, raw_jd: str, user_profile: UserProfile, source: str = "manual") -> Job:
-        parsed = self._parse_jd(raw_jd)
+    def run(
+        self,
+        raw_jd: str,
+        user_profile: UserProfile,
+        source: str = "manual",
+        source_url: str = "",
+        # Scrapers may supply pre-extracted fields to skip a parse LLM call
+        title: str = "",
+        company: str = "",
+        location: str = "",
+        salary_range: str = "",
+    ) -> Job:
+        # Only call parse if scrapers didn't already supply title/company
+        if title and company:
+            parsed = {
+                "title": title,
+                "company": company,
+                "location": location,
+                "salary_range": salary_range,
+                "skills_required": self._parse_jd(raw_jd).get("skills_required", []),
+            }
+        else:
+            parsed = self._parse_jd(raw_jd)
+
         gap = self._score(raw_jd, user_profile)
 
         job = Job(
             source=source,
+            source_url=source_url,
             raw_jd=raw_jd,
             title=parsed.get("title", ""),
             company=parsed.get("company", ""),
