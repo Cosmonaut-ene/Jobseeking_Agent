@@ -6,3 +6,8 @@ data/user_profile.json
 __pycache__/
 *.pyc
 .python-version
+data/cover_letters/
+build/
+dist/
+web/frontend/dist/
+web/frontend/node_modules/

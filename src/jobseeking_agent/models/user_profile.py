@@ -35,6 +35,14 @@ class Project(BaseModel):
     bullets: list[Bullet] = Field(default_factory=list)
 
 
+class Education(BaseModel):
+    institution: str
+    degree: str
+    field: str = ""
+    duration: str = ""   # "2018-03 ~ 2022-06"
+    gpa: str = ""
+
+
 class SalaryRange(BaseModel):
     min: int
     max: int
@@ -54,6 +62,7 @@ class UserProfile(BaseModel):
     experience: list[Experience]
     projects: list[Project]
     preferences: Preferences
+    education: list[Education] = Field(default_factory=list)
 
     @classmethod
     def load(cls, path: Path | str = "data/user_profile.json") -> "UserProfile":
@@ -93,5 +102,10 @@ class UserProfile(BaseModel):
             lines.append(f"  {proj.description}")
             for b in proj.bullets:
                 lines.append(f"  - {b.raw}")
+
+        if self.education:
+            lines.append("\n## Education")
+            for edu in self.education:
+                lines.append(f"  {edu.degree} in {edu.field} @ {edu.institution} ({edu.duration})")
 
         return "\n".join(lines)

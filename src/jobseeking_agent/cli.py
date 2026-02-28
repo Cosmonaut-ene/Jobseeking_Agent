@@ -513,6 +513,13 @@ def schedule() -> None:
     start()
 
 
+def ui() -> None:
+    from dotenv import load_dotenv
+    load_dotenv()
+    from jobseeking_agent.tui.app import JobSeekingApp
+    JobSeekingApp().run()
+
+
 if __name__ == "__main__":
     commands = {
         "scout": scout,
@@ -523,11 +530,15 @@ if __name__ == "__main__":
         "advisor": advisor,
         "run": run,
         "schedule": schedule,
+        "ui": ui,
     }
     if len(sys.argv) > 1 and sys.argv[1] in commands:
         commands[sys.argv[1]]()
+    elif len(sys.argv) == 1:
+        # Double-clicked or run without arguments → launch TUI
+        ui()
     else:
         console.print(
             "Usage: python -m jobseeking_agent.cli "
-            "[scout|seek-scout|linkedin-scout|tailor|apply|advisor|run|schedule]"
+            "[scout|seek-scout|linkedin-scout|tailor|apply|advisor|run|schedule|ui]"
         )
