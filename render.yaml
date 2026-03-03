@@ -5,14 +5,25 @@ services:
     region: singapore
     plan: free
     buildCommand: |
-      pip install -r web/backend/requirements.txt &&
-      playwright install chromium --with-deps &&
-      cd web/frontend && npm install && npm run build
-    startCommand: uvicorn web.backend.main:app --host 0.0.0.0 --port $PORT
+      pip install -r backend/requirements.txt
+      playwright install chromium --with-deps
+      cd frontend && npm ci && npm run build
+    startCommand: uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GEMINI_API_KEY
-        sync: false   # set manually in Render dashboard
-
+        sync: false
+      - key: NOTIFICATION_WEBHOOK_URL
+        sync: false
+      - key: NOTIFICATION_CHAT_ID
+        sync: false
+      - key: SCHEDULER_ENABLED
+        value: "true"
+      - key: SCHEDULER_HOUR
+        value: "9"
+      - key: HIGH_SCORE_THRESHOLD
+        value: "0.80"
+      - key: MID_SCORE_THRESHOLD
+        value: "0.70"
     disk:
       name: jobseeking-data
       mountPath: /opt/render/project/src/data

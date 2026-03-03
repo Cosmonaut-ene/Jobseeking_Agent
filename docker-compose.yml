@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - NOTIFICATION_WEBHOOK_URL=${NOTIFICATION_WEBHOOK_URL:-}
+      - NOTIFICATION_CHAT_ID=${NOTIFICATION_CHAT_ID:-}
+      - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
+      - SCHEDULER_HOUR=${SCHEDULER_HOUR:-9}
+      - SCHEDULER_MINUTE=${SCHEDULER_MINUTE:-0}
+      - HIGH_SCORE_THRESHOLD=${HIGH_SCORE_THRESHOLD:-0.80}
+      - MID_SCORE_THRESHOLD=${MID_SCORE_THRESHOLD:-0.70}
+    restart: unless-stopped
+
+volumes:
+  data:
