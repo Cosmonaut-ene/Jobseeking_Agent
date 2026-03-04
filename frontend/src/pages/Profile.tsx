@@ -451,7 +451,16 @@ export default function Profile() {
 
   useEffect(() => {
     api.get('/api/profile')
-      .then((r) => setProfile({ education: [], ...r.data }))
+      .then((r) => setProfile({
+        name: '',
+        target_roles: [],
+        skills: [],
+        experience: [],
+        projects: [],
+        preferences: { locations: [], salary_range: null, job_types: [] },
+        education: [],
+        ...r.data
+      }))
       .catch(() => { /* profile not yet created */ })
       .finally(() => setLoading(false))
   }, [])
@@ -472,10 +481,10 @@ export default function Profile() {
 
   const TABS: { key: Tab; label: string }[] = [
     { key: 'basic', label: 'Basic' },
-    { key: 'skills', label: `Skills (${profile.skills.length})` },
+    { key: 'skills', label: `Skills (${(profile.skills ?? []).length})` },
     { key: 'education', label: `Education (${(profile.education ?? []).length})` },
-    { key: 'experience', label: `Experience (${profile.experience.length})` },
-    { key: 'projects', label: `Projects (${profile.projects.length})` },
+    { key: 'experience', label: `Experience (${(profile.experience ?? []).length})` },
+    { key: 'projects', label: `Projects (${(profile.projects ?? []).length})` },
     { key: 'preferences', label: 'Preferences' },
   ]
 

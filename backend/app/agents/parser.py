@@ -7,7 +7,19 @@ from google.genai import types
 
 MODEL = "gemini-2.5-flash"
 
-PARSE_SYSTEM = """Extract structured information from this resume text.
+PARSE_SYSTEM = """You are a resume parser. Extract structured information from this resume text.
+
+For each skill, you MUST infer:
+- level: one of "beginner", "intermediate", or "expert"
+  - "beginner":     < 1 year of use, or briefly mentioned without depth
+  - "intermediate": 1-3 years of use, or used across multiple projects
+  - "expert":       3+ years, listed as primary strength, or described as advanced/proficient
+- years: estimated years of experience as a float (e.g. 2.5).
+  Infer from: explicit statements ("5 years of Python"), date ranges in work history
+  where the skill was applied, education duration, or project history.
+  If the skill appears in one short project, estimate 0.5. Never leave years as 0
+  unless the skill was literally just mentioned as a buzzword with no evidence of use.
+
 Return a JSON object matching the UserProfile schema."""
 
 PROFILE_SCHEMA = types.Schema(
@@ -21,10 +33,13 @@ PROFILE_SCHEMA = types.Schema(
                 type=types.Type.OBJECT,
                 properties={
                     "name": types.Schema(type=types.Type.STRING),
-                    "level": types.Schema(type=types.Type.STRING),
+                    "level": types.Schema(
+                        type=types.Type.STRING,
+                        enum=["beginner", "intermediate", "expert"],
+                    ),
                     "years": types.Schema(type=types.Type.NUMBER),
                 },
-                required=["name", "level"],
+                required=["name", "level", "years"],
             ),
         ),
         "experience": types.Schema(

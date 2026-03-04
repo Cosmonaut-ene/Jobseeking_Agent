@@ -51,14 +51,14 @@ export default function Resume() {
       if (tab === 'upload' && file) {
         const form = new FormData()
         form.append('file', file)
-        const r = await api.post('/api/profile/upload', form, {
+        const r = await api.post('/api/profile/upload-resume', form, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
-        data = r.data
+        data = r.data.profile
       } else {
         if (!text.trim()) { setError('Paste resume text first.'); setParsing(false); return }
-        const r = await api.post('/api/profile/parse', { text })
-        data = r.data
+        const r = await api.post('/api/profile/parse-resume', { text })
+        data = r.data.profile
       }
       setParsed(data)
     } catch (e: unknown) {
@@ -80,9 +80,9 @@ export default function Resume() {
 
       const merged: UserProfile = {
         ...parsed,
-        skills:     mergeSkills(existing?.skills ?? [], parsed.skills),
-        experience: mergeExperience(existing?.experience ?? [], parsed.experience),
-        projects:   mergeProjects(existing?.projects ?? [], parsed.projects),
+        skills:     mergeSkills(existing?.skills ?? [], parsed.skills ?? []),
+        experience: mergeExperience(existing?.experience ?? [], parsed.experience ?? []),
+        projects:   mergeProjects(existing?.projects ?? [], parsed.projects ?? []),
         education:  mergeEducation(existing?.education ?? [], parsed.education ?? []),
       }
 
@@ -192,14 +192,14 @@ export default function Resume() {
           <section>
             <h3 className="text-sm font-semibold text-gray-700 mb-1">Basic Info</h3>
             <p className="text-sm text-gray-800 font-medium">{parsed.name}</p>
-            <p className="text-sm text-gray-500">Target roles: {parsed.target_roles.join(', ')}</p>
+            <p className="text-sm text-gray-500">Target roles: {parsed.target_roles?.join(', ') ?? '—'}</p>
           </section>
 
           {/* Skills */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Skills ({parsed.skills.length})</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Skills ({parsed.skills?.length ?? 0})</h3>
             <div className="flex flex-wrap gap-1.5">
-              {parsed.skills.map((s) => (
+              {(parsed.skills ?? []).map((s) => (
                 <span key={s.name} className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs">
                   {s.name} · {s.level} · {s.years}y
                 </span>
@@ -209,17 +209,17 @@ export default function Resume() {
 
           {/* Experience */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Experience ({parsed.experience.length})</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Experience ({parsed.experience?.length ?? 0})</h3>
             <div className="space-y-2">
-              {parsed.experience.map((exp, i) => (
+              {(parsed.experience ?? []).map((exp, i) => (
                 <div key={i} className="border-l-2 border-blue-200 pl-3">
                   <p className="text-sm font-medium text-gray-800">{exp.role} @ {exp.company}</p>
                   <p className="text-xs text-gray-500">{exp.duration}</p>
                   <ul className="mt-1 space-y-0.5">
-                    {exp.bullets.slice(0, 2).map((b, j) => (
+                    {(exp.bullets ?? []).slice(0, 2).map((b, j) => (
                       <li key={j} className="text-xs text-gray-600">• {b.raw}</li>
                     ))}
-                    {exp.bullets.length > 2 && <li className="text-xs text-gray-400">+{exp.bullets.length - 2} more</li>}
+                    {(exp.bullets?.length ?? 0) > 2 && <li className="text-xs text-gray-400">+{(exp.bullets?.length ?? 0) - 2} more</li>}
                   </ul>
                 </div>
               ))}
@@ -228,12 +228,12 @@ export default function Resume() {
 
           {/* Projects */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">Projects ({parsed.projects.length})</h3>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">Projects ({parsed.projects?.length ?? 0})</h3>
             <div className="space-y-2">
-              {parsed.projects.map((p, i) => (
+              {(parsed.projects ?? []).map((p, i) => (
                 <div key={i} className="border-l-2 border-purple-200 pl-3">
                   <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                  <p className="text-xs text-gray-500">{p.tech_stack.join(', ')}</p>
+                  <p className="text-xs text-gray-500">{p.tech_stack?.join(', ')}</p>
                 </div>
               ))}
             </div>
@@ -259,15 +259,15 @@ export default function Resume() {
           <section>
             <h3 className="text-sm font-semibold text-gray-700 mb-1">Preferences</h3>
             <p className="text-sm text-gray-600">
-              Locations: {parsed.preferences.locations.join(', ') || '—'}
+              Locations: {parsed.preferences?.locations?.join(', ') || '—'}
             </p>
-            {parsed.preferences.salary_range && (
+            {parsed.preferences?.salary_range && (
               <p className="text-sm text-gray-600">
                 Salary: {parsed.preferences.salary_range.min}–{parsed.preferences.salary_range.max} {parsed.preferences.salary_range.currency}
               </p>
             )}
             <p className="text-sm text-gray-600">
-              Job types: {parsed.preferences.job_types.join(', ') || '—'}
+              Job types: {parsed.preferences?.job_types?.join(', ') || '—'}
             </p>
           </section>
         </div>
