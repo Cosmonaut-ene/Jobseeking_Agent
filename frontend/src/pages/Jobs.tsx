@@ -188,6 +188,7 @@ export default function Jobs() {
   const [resume, setResume] = useState<ResumeVersion | null>(null)
   const [coverLetter, setCoverLetter] = useState<string | null>(null)
   const [showJD, setShowJD] = useState(false)
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
 
   useEffect(() => { fetchJobs() }, [])
 
@@ -205,6 +206,7 @@ export default function Jobs() {
     setActionMsg('')
     setResume(null)
     setCoverLetter(null)
+    setPdfUrl(null)
     setShowJD(false)
     try {
       const r = await api.get(`/api/jobs/${job.id}`)
@@ -239,6 +241,7 @@ export default function Jobs() {
     try {
       const r = await api.post(`/api/jobs/${jobId}/tailor`)
       setResume(r.data)
+      if (r.data.pdf_download_url) setPdfUrl(r.data.pdf_download_url)
       setActionMsg('✅ Resume tailored!')
     } catch (e: unknown) {
       setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Tailor failed')
@@ -357,6 +360,15 @@ export default function Jobs() {
                 <ActionButton label="✅ Approve" onClick={() => updateStatus(selected.id, 'reviewed')} loading={actionLoading === 'status'} variant="success" />
                 <ActionButton label="❌ Dismiss" onClick={() => updateStatus(selected.id, 'dismissed')} loading={actionLoading === 'status'} variant="danger" />
                 <ActionButton label={actionLoading === 'tailor' ? 'Tailoring…' : '✂️ Tailor Resume'} onClick={() => tailor(selected.id)} loading={actionLoading === 'tailor'} />
+                {pdfUrl && (
+                  <a
+                    href={pdfUrl}
+                    download
+                    className="px-3 py-1.5 rounded text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                  >
+                    ⬇ Download PDF
+                  </a>
+                )}
                 <ActionButton label={actionLoading === 'apply' ? 'Applying…' : '📤 Apply'} onClick={() => apply(selected.id)} loading={actionLoading === 'apply'} variant="success" />
               </div>
 

@@ -1,7 +1,15 @@
 """FastAPI entry point for Jobseeking Agent v2."""
 import logging
-from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 from pathlib import Path
+
+_env_path = Path(__file__).parents[2] / ".env"  # Jobseeking_Agent/.env
+load_dotenv(_env_path, override=True)  # override=True so saved .env values always apply
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+logger.info("Loaded .env from %s", _env_path)
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,9 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.database import init_db
 from backend.app.scheduler import start_scheduler, stop_scheduler
-from backend.app.routers import jobs, profile, settings, notifications, scrapers, dashboard
-
-logging.basicConfig(level=logging.INFO)
+from backend.app.routers import jobs, profile, settings, notifications, scrapers, dashboard, files
 
 
 @asynccontextmanager
@@ -49,6 +55,7 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(scrapers.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
+app.include_router(files.router, prefix="/api")
 
 # Serve React build
 frontend_dist = Path(__file__).parents[2] / "frontend" / "dist"

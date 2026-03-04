@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><style>
+body { font-family: Arial, sans-serif; font-size: 11pt; margin: 2cm; color: #333; }
+h1 { font-size: 16pt; margin-bottom: 4px; }
+h2 { font-size: 12pt; border-bottom: 1px solid #ccc; padding-bottom: 2px; margin-top: 14px; }
+.item { margin-bottom: 8px; }
+.meta { color: #666; font-size: 10pt; }
+ul { margin: 4px 0; padding-left: 18px; }
+li { margin-bottom: 2px; }
+.skills { display: flex; flex-wrap: wrap; gap: 4px; }
+.skill-tag { background: #eee; padding: 2px 6px; border-radius: 3px; font-size: 10pt; }
+</style></head>
+<body>
+<h1>{{ name }}</h1>
+{% if summary %}<p>{{ summary }}</p>{% endif %}
+{% if skills %}<h2>Skills</h2><div class="skills">{% for s in skills %}<span class="skill-tag">{{ s }}</span>{% endfor %}</div>{% endif %}
+{% if experience %}<h2>Experience</h2>{% for exp in experience %}<div class="item"><strong>{{ exp.role }}</strong> <span class="meta">@ {{ exp.company }} · {{ exp.duration }}</span><ul>{% for b in exp.bullets %}<li>{{ b }}</li>{% endfor %}</ul></div>{% endfor %}{% endif %}
+{% if projects %}<h2>Projects</h2>{% for p in projects %}<div class="item"><strong>{{ p.name }}</strong><ul>{% for b in p.bullets %}<li>{{ b.rewritten if b.rewritten is defined else b }}</li>{% endfor %}</ul></div>{% endfor %}{% endif %}
+{% if education %}<h2>Education</h2>{% for e in education %}<div class="item"><strong>{{ e.degree }} in {{ e.field }}</strong> <span class="meta">@ {{ e.institution }} · {{ e.duration }}</span></div>{% endfor %}{% endif %}
+</body></html>

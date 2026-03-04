@@ -128,7 +128,19 @@ def tailor_job(job_id: str) -> dict:
             session.add(resume_version)
             session.commit()
             session.refresh(resume_version)
-            return jsonable_encoder(resume_version)
+            result = jsonable_encoder(resume_version)
+            # Generate PDF
+            try:
+                from backend.app.pdf_generator import generate_resume_pdf
+                from backend.app.config import RESUMES_DIR
+                template_path = Path(__file__).parents[3] / "templates" / "resume.html"
+                output_path = RESUMES_DIR / f"tailored_{job_id}.pdf"
+                generate_resume_pdf(resume_version.content_json or {}, profile, template_path, output_path)
+                result["pdf_download_url"] = f"/api/files/{job_id}/resume.pdf"
+            except Exception as pdf_err:
+                import logging
+                logging.getLogger(__name__).warning("PDF generation failed: %s", pdf_err)
+            return result
     except HTTPException:
         raise
     except Exception as e:
