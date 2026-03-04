@@ -304,6 +304,85 @@ class TestProfileAPI:
         saved = json.loads(profile_path.read_text())
         assert saved["name"] == "Persisted User"
 
+    # ------------------------------------------------------------------
+    # parse-resume endpoint tests
+    # ------------------------------------------------------------------
+
+    def test_parse_resume_text_without_api_key(self, tmp_path, monkeypatch):
+        """POST /api/profile/parse-resume without GEMINI_API_KEY should return 400."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        db_file = tmp_path / "test_parse_no_key.db"
+        test_engine = create_engine(f"sqlite:///{db_file}", echo=False)
+        from backend.app.models import job, application, resume_version
+        SQLModel.metadata.create_all(test_engine)
+        monkeypatch.setattr("backend.app.database.engine", test_engine)
+        monkeypatch.setenv("SCHEDULER_ENABLED", "false")
+
+        from backend.app.main import app
+        test_client = TestClient(app, raise_server_exceptions=False)
+        response = test_client.post("/api/profile/parse-resume", json={"text": "Some resume text"})
+        assert response.status_code == 400
+
+    def test_parse_resume_text_with_empty_text(self, client):
+        """POST /api/profile/parse-resume with empty text should return 400."""
+        response = client.post("/api/profile/parse-resume", json={"text": ""})
+        assert response.status_code == 400
+
+    def test_parse_resume_text_with_whitespace_only(self, client):
+        """POST /api/profile/parse-resume with whitespace-only text should return 400."""
+        response = client.post("/api/profile/parse-resume", json={"text": "   \n\t  "})
+        assert response.status_code == 400
+
+    def test_parse_resume_text_returns_parsed_profile(self, client):
+        """POST /api/profile/parse-resume with valid text and mocked parser returns profile shape."""
+        sample_profile = {
+            "name": "Test User",
+            "target_roles": ["Engineer"],
+            "skills": [{"name": "Python", "level": "expert", "years": 3}],
+            "experience": [],
+            "projects": [],
+            "preferences": {"locations": ["Sydney"], "job_types": ["full-time"]},
+            "education": [],
+        }
+        with patch("backend.app.agents.parser.ResumeParser.parse_text", return_value=sample_profile):
+            response = client.post(
+                "/api/profile/parse-resume",
+                json={"text": "Jane Doe\nSoftware Engineer with 3 years of Python experience."},
+            )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["parsed"] is True
+        assert "profile" in data
+        assert data["profile"]["name"] == "Test User"
+        assert data["profile"]["target_roles"] == ["Engineer"]
+        assert data["profile"]["skills"][0]["name"] == "Python"
+
+    # ------------------------------------------------------------------
+    # upload-resume endpoint tests
+    # ------------------------------------------------------------------
+
+    def test_upload_resume_without_api_key(self, tmp_path, monkeypatch):
+        """POST /api/profile/upload-resume without GEMINI_API_KEY should return 400."""
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+        db_file = tmp_path / "test_upload_no_key.db"
+        test_engine = create_engine(f"sqlite:///{db_file}", echo=False)
+        from backend.app.models import job, application, resume_version
+        SQLModel.metadata.create_all(test_engine)
+        monkeypatch.setattr("backend.app.database.engine", test_engine)
+        monkeypatch.setenv("SCHEDULER_ENABLED", "false")
+
+        from backend.app.main import app
+        test_client = TestClient(app, raise_server_exceptions=False)
+
+        dummy_pdf = b"%PDF-1.4 dummy content"
+        response = test_client.post(
+            "/api/profile/upload-resume",
+            files={"file": ("resume.pdf", dummy_pdf, "application/pdf")},
+        )
+        assert response.status_code == 400
+
 
 class TestSettingsAPI:
     def test_get_settings(self, client):
@@ -343,6 +422,130 @@ class TestSettingsAPI:
         data = response.json()
         # notification_webhook_set should be False when env not set
         assert "notification_webhook_set" in data
+
+
+class TestResumeParser:
+    def test_parse_text_uses_level_and_years_from_response(self, monkeypatch):
+        """parse_text should propagate non-beginner level and non-zero years from Gemini."""
+        from unittest.mock import MagicMock
+        from backend.app.agents.parser import ResumeParser
+
+        sample_response = {
+            "name": "Jane Doe",
+            "target_roles": ["Data Engineer"],
+            "skills": [
+                {"name": "Python", "level": "expert", "years": 5.0},
+                {"name": "SQL", "level": "intermediate", "years": 2.5},
+                {"name": "Docker", "level": "beginner", "years": 0.5},
+            ],
+            "experience": [],
+            "projects": [],
+            "preferences": {"locations": [], "job_types": []},
+        }
+
+        mock_response = MagicMock()
+        mock_response.text = json.dumps(sample_response)
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        parser = ResumeParser.__new__(ResumeParser)
+        parser.client = mock_client
+
+        result = parser.parse_text("Jane Doe resume text")
+
+        skills = {s["name"]: s for s in result["skills"]}
+        assert skills["Python"]["level"] == "expert"
+        assert skills["Python"]["years"] == 5.0
+        assert skills["SQL"]["level"] == "intermediate"
+        assert skills["SQL"]["years"] == 2.5
+        assert skills["Docker"]["level"] == "beginner"
+        assert skills["Docker"]["years"] == 0.5
+
+    def test_parse_text_schema_has_enum_for_level(self):
+        """PROFILE_SCHEMA skills.level must restrict values via enum."""
+        from backend.app.agents.parser import PROFILE_SCHEMA
+
+        skills_schema = PROFILE_SCHEMA.properties["skills"]
+        level_schema = skills_schema.items.properties["level"]
+        assert level_schema.enum == ["beginner", "intermediate", "expert"]
+
+    def test_parse_text_schema_requires_years(self):
+        """PROFILE_SCHEMA skills must list 'years' as required."""
+        from backend.app.agents.parser import PROFILE_SCHEMA
+
+        skills_items = PROFILE_SCHEMA.properties["skills"].items
+        assert "years" in skills_items.required
+
+    def test_parse_text_system_prompt_mentions_level_inference(self):
+        """PARSE_SYSTEM should include guidance for inferring level and years."""
+        from backend.app.agents.parser import PARSE_SYSTEM
+
+        lowered = PARSE_SYSTEM.lower()
+        assert "intermediate" in lowered
+        assert "expert" in lowered
+        assert "year" in lowered
+
+    def test_parse_text_skills_not_all_beginner(self, monkeypatch):
+        """A resume with clear seniority signals should produce non-beginner skills."""
+        from unittest.mock import MagicMock
+        from backend.app.agents.parser import ResumeParser
+
+        mixed_skills = {
+            "name": "Senior Dev",
+            "target_roles": ["Backend Engineer"],
+            "skills": [
+                {"name": "Go", "level": "expert", "years": 6.0},
+                {"name": "Kubernetes", "level": "intermediate", "years": 2.0},
+                {"name": "Rust", "level": "beginner", "years": 0.5},
+            ],
+            "experience": [],
+            "projects": [],
+            "preferences": {"locations": [], "job_types": []},
+        }
+
+        mock_response = MagicMock()
+        mock_response.text = json.dumps(mixed_skills)
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        parser = ResumeParser.__new__(ResumeParser)
+        parser.client = mock_client
+
+        result = parser.parse_text("Senior engineer resume...")
+        levels = [s["level"] for s in result["skills"]]
+        assert "expert" in levels or "intermediate" in levels, (
+            "Expected at least one non-beginner skill level"
+        )
+
+    def test_parse_text_years_nonzero_for_experienced_skills(self, monkeypatch):
+        """Skills from an experienced resume should have years > 0."""
+        from unittest.mock import MagicMock
+        from backend.app.agents.parser import ResumeParser
+
+        experienced = {
+            "name": "Alice",
+            "target_roles": ["ML Engineer"],
+            "skills": [
+                {"name": "PyTorch", "level": "expert", "years": 4.0},
+                {"name": "MLflow", "level": "intermediate", "years": 1.5},
+            ],
+            "experience": [],
+            "projects": [],
+            "preferences": {"locations": [], "job_types": []},
+        }
+
+        mock_response = MagicMock()
+        mock_response.text = json.dumps(experienced)
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        parser = ResumeParser.__new__(ResumeParser)
+        parser.client = mock_client
+
+        result = parser.parse_text("Alice ML resume...")
+        for skill in result["skills"]:
+            assert skill["years"] > 0, f"Skill '{skill['name']}' has years=0"
 
 
 class TestNotificationsAPI:

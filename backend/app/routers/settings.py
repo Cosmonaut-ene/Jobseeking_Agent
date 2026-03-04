@@ -1,9 +1,11 @@
 """Settings router."""
 import os
+import logging
 from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["settings"])
 
 _SETTINGS_FILE = Path("data/settings.json")
@@ -52,7 +54,7 @@ class SettingsUpdate(BaseModel):
 
 @router.post("/settings")
 def update_settings(body: SettingsUpdate) -> dict:
-    env_path = Path(".env")
+    env_path = Path(__file__).parents[3] / ".env"  # Jobseeking_Agent/.env
     lines: list[str] = []
     if env_path.exists():
         lines = env_path.read_text().splitlines()
@@ -94,3 +96,43 @@ def update_settings(body: SettingsUpdate) -> dict:
         _save_settings({"scraper_config": body.scraper_config})
 
     return {"saved": True}
+
+
+@router.post("/settings/key")
+def save_api_key(data: dict) -> dict:
+    """Save API key to environment and .env file."""
+    # Frontend sends { key: "..." }
+    key = data.get("key", "") or data.get("gemini_api_key", "")
+    if not key:
+        logger.warning("save_api_key called with empty key. Request body: %s", list(data.keys()))
+        return {"error": "API key is required"}
+
+    # Save to project root .env file
+    env_path = Path(__file__).parents[3] / ".env"  # Jobseeking_Agent/.env
+    logger.info("Writing GEMINI_API_KEY to %s", env_path)
+
+    lines: list[str] = []
+    if env_path.exists():
+        lines = [l for l in env_path.read_text().splitlines() if not l.startswith("GEMINI_API_KEY=")]
+    lines.append(f"GEMINI_API_KEY={key}")
+    env_path.write_text("\n".join(lines) + "\n")
+
+    # Also set in current process
+    os.environ["GEMINI_API_KEY"] = key
+    logger.info("GEMINI_API_KEY set in os.environ and written to .env")
+
+    return {"saved": True}
+
+
+@router.get("/settings/status")
+def get_settings_status() -> dict:
+    """Check current settings status. Returns has_key and key_preview for the frontend."""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    has_key = bool(api_key)
+    key_preview = f"...{api_key[-4:]}" if len(api_key) >= 4 else ""
+    logger.info("settings/status: has_key=%s", has_key)
+    return {
+        "has_key": has_key,
+        "key_preview": key_preview,
+        "database": "connected",
+    }
