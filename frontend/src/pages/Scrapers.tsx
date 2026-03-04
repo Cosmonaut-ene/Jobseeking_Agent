@@ -64,17 +64,17 @@ export default function Scrapers() {
   const [indeedTaskId, setIndeedTaskId] = useState<string | null>(null)
   const indeedTask = useTask(indeedTaskId)
 
-  // LinkedIn Auto
-  const [liKeywords, setLiKeywords] = useState('Data Scientist, Machine Learning Engineer')
-  const [liLoc, setLiLoc] = useState('Sydney, New South Wales, Australia')
-  const [liMax, setLiMax] = useState(25)
-  const [liTaskId, setLiTaskId] = useState<string | null>(null)
-  const liTask = useTask(liTaskId)
-
-  // LinkedIn URLs fallback
+  // LinkedIn URLs
   const [liUrls, setLiUrls] = useState('')
   const [liUrlTaskId, setLiUrlTaskId] = useState<string | null>(null)
   const liUrlTask = useTask(liUrlTaskId)
+
+  // LinkedIn RSS (no login)
+  const [rssKeywords, setRssKeywords] = useState('Data Scientist, Machine Learning Engineer')
+  const [rssLoc, setRssLoc] = useState('Sydney, New South Wales, Australia')
+  const [rssMax, setRssMax] = useState(25)
+  const [rssTaskId, setRssTaskId] = useState<string | null>(null)
+  const rssTask = useTask(rssTaskId)
 
   const startSeek = async () => {
     const r = await api.post('/api/scrapers/seek', {
@@ -94,19 +94,19 @@ export default function Scrapers() {
     setIndeedTaskId(r.data.task_id)
   }
 
-  const startLinkedInAuto = async () => {
-    const r = await api.post('/api/scrapers/linkedin', {
-      keywords: liKeywords.split(',').map(s => s.trim()).filter(Boolean),
-      location: liLoc,
-      max_results: liMax
-    })
-    setLiTaskId(r.data.task_id)
-  }
-
   const startLinkedInUrls = async () => {
     const urls = liUrls.split('\n').map(u => u.trim()).filter(Boolean)
     const r = await api.post('/api/scrapers/linkedin-urls', { urls })
     setLiUrlTaskId(r.data.task_id)
+  }
+
+  const startLinkedInRss = async () => {
+    const r = await api.post('/api/scrapers/linkedin-rss', {
+      keywords: rssKeywords.split(',').map(s => s.trim()).filter(Boolean),
+      location: rssLoc,
+      max_results: rssMax
+    })
+    setRssTaskId(r.data.task_id)
   }
 
   const inputCls = 'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400'
@@ -162,45 +162,48 @@ export default function Scrapers() {
         <TaskStatus task={indeedTask} />
       </div>
 
-      {/* LinkedIn Auto */}
+      {/* LinkedIn URL */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-2">LinkedIn (自动模式)</h2>
+        <h2 className="text-lg font-semibold mb-2">LinkedIn URL 模式</h2>
         <p className="text-sm text-gray-500 mb-4">
-          需要先在"通知"页面上传 LinkedIn Cookies。
+          在 LinkedIn 找到感兴趣的职位后，粘贴 URL 由系统自动抓取详情并评分。
+        </p>
+        <textarea
+          className={inputCls + ' h-24 font-mono'}
+          placeholder="每行粘贴一个 LinkedIn 职位 URL"
+          value={liUrls}
+          onChange={e => setLiUrls(e.target.value)}
+        />
+        <button className={btnCls + ' mt-2'} onClick={startLinkedInUrls} disabled={liUrlTask?.status === 'running'}>
+          {liUrlTask?.status === 'running' ? '⏳ 处理中...' : '📥 处理 URLs'}
+        </button>
+        <TaskStatus task={liUrlTask} />
+      </div>
+
+      {/* LinkedIn RSS */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold mb-2">LinkedIn RSS (无需登录)</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          通过 LinkedIn 公开 RSS 搜索职位，无需 Cookies，零封号风险。
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label className="block text-xs text-gray-500 mb-1">关键词 (逗号分隔)</label>
-            <input className={inputCls} value={liKeywords} onChange={e => setLiKeywords(e.target.value)} />
+            <input className={inputCls} value={rssKeywords} onChange={e => setRssKeywords(e.target.value)} />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">地点</label>
-            <input className={inputCls} value={liLoc} onChange={e => setLiLoc(e.target.value)} />
+            <input className={inputCls} value={rssLoc} onChange={e => setRssLoc(e.target.value)} />
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">最大数量</label>
-            <input className={inputCls} type="number" value={liMax} onChange={e => setLiMax(Number(e.target.value))} />
+            <input className={inputCls} type="number" value={rssMax} onChange={e => setRssMax(Number(e.target.value))} />
           </div>
         </div>
-        <button className={btnCls} onClick={startLinkedInAuto} disabled={liTask?.status === 'running'}>
-          {liTask?.status === 'running' ? '⏳ 爬取中...' : '🚀 自动搜索并爬取'}
+        <button className={btnCls} onClick={startLinkedInRss} disabled={rssTask?.status === 'running'}>
+          {rssTask?.status === 'running' ? '⏳ 爬取中...' : '🚀 RSS 搜索'}
         </button>
-        <TaskStatus task={liTask} />
-
-        {/* URL fallback */}
-        <div className="mt-6 border-t pt-4">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">URL 模式 (备用)</h3>
-          <textarea
-            className={inputCls + ' h-24 font-mono'}
-            placeholder="每行粘贴一个 LinkedIn 职位 URL"
-            value={liUrls}
-            onChange={e => setLiUrls(e.target.value)}
-          />
-          <button className={btnCls + ' mt-2'} onClick={startLinkedInUrls} disabled={liUrlTask?.status === 'running'}>
-            {liUrlTask?.status === 'running' ? '⏳ 处理中...' : '📥 处理 URLs'}
-          </button>
-          <TaskStatus task={liUrlTask} />
-        </div>
+        <TaskStatus task={rssTask} />
       </div>
     </div>
   )
