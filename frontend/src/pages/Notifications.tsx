@@ -24,13 +24,13 @@ export default function Notifications() {
   const [cookiesMsg, setCookiesMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    api.get('/notifications/linkedin-cookies-status').then(r => setCookiesStatus(r.data)).catch(() => {})
+    api.get('/api/notifications/linkedin-cookies-status').then(r => setCookiesStatus(r.data)).catch(() => {})
   }, [])
 
   useEffect(() => {
     if (!taskId || task?.status === 'done' || task?.status === 'error') return
     const interval = setInterval(() => {
-      api.get(`/notifications/tasks/${taskId}`).then(r => setTask(r.data)).catch(() => {})
+      api.get(`/api/notifications/tasks/${taskId}`).then(r => setTask(r.data)).catch(() => {})
     }, 2000)
     return () => clearInterval(interval)
   }, [taskId, task?.status])
@@ -39,7 +39,7 @@ export default function Notifications() {
     setTesting(true)
     setTestResult(null)
     try {
-      await api.post('/notifications/test')
+      await api.post('/api/notifications/test')
       setTestResult('✅ 通知发送成功！')
     } catch (e: any) {
       setTestResult(`❌ 失败: ${e.response?.data?.detail || e.message}`)
@@ -52,7 +52,7 @@ export default function Notifications() {
     setTriggering(true)
     setTask(null)
     try {
-      const r = await api.post('/notifications/trigger-scout')
+      const r = await api.post('/api/notifications/trigger-scout')
       setTaskId(r.data.task_id)
       setTask({ status: 'running', progress: 'Starting...' })
     } catch (e: any) {
@@ -70,11 +70,11 @@ export default function Notifications() {
     const formData = new FormData()
     formData.append('file', file)
     try {
-      await api.post('/notifications/upload-linkedin-cookies', formData, {
+      await api.post('/api/notifications/upload-linkedin-cookies', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
       setCookiesMsg('✅ Cookies 上传成功！')
-      const r = await api.get('/notifications/linkedin-cookies-status')
+      const r = await api.get('/api/notifications/linkedin-cookies-status')
       setCookiesStatus(r.data)
     } catch (e: any) {
       setCookiesMsg(`❌ 上传失败: ${e.response?.data?.detail || e.message}`)

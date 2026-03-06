@@ -1,8 +1,8 @@
 # 求职助手系统 — 产品规格说明书
 
-**版本**：2.0
+**版本**：2.1
 **状态**：已实现
-**最后更新**：2026年3月4日
+**最后更新**：2026年3月7日
 **作者**：Zhang
 
 ---
@@ -74,7 +74,7 @@
 | F-01 | Seek.com.au 抓取器（关键词+地点+日期筛选） | P0 | ✅ 完成 |
 | F-02 | Indeed.com.au 抓取器（关键词+地点+日期筛选） | P0 | ✅ 完成 |
 | F-04 | LinkedIn URL 批量解析（用户提供 URL，系统自动抓取详情） | P1 | ✅ 完成 |
-| F-04b | LinkedIn RSS 无登录搜索（公开职位，无封号风险） | P2 | 🔲 待开发 |
+| F-04b | LinkedIn RSS 无登录搜索（公开职位，无封号风险） | P2 | ✅ 完成 |
 | F-05 | 每次抓取可配置最大结果数 | P1 | ✅ 完成 |
 | F-06 | 基于职位 URL 去重（跳过已见职位） | P0 | ✅ 完成 |
 | F-07 | 通过粘贴手动录入职位（Scout 页面） | P1 | ✅ 完成 |
@@ -716,7 +716,7 @@ AI 顾问报告——技能差距分析。
 
 ## 9. 开发路线图
 
-### v2.0 — 当前版本 ✅
+### v2.0 ✅
 
 - 完整自动抓取流水线（Seek、Indeed、LinkedIn）
 - AI Scout Agent（匹配评分 + 自动过滤）
@@ -727,17 +727,19 @@ AI 顾问报告——技能差距分析。
 - React 仪表板（共8个页面）
 - 106 个通过测试
 
-### v2.1 — 近期改进
+### v2.1 — 当前版本 ✅
 
-| 功能 | 优先级 | 备注 |
-|---|---|---|
-| 移动端响应式 UI | P1 | 可折叠侧边栏，触控友好 |
-| 简历 PDF 导出 | P1 | 从定制简历生成可下载 PDF |
-| 职位备注/标签 | P2 | 用户自定义标签 |
-| 多简历档案 | P2 | 针对不同职位类型使用不同档案 |
-| Seek 自动申请 | P2 | 通过 Playwright 自动化一键 Easy Apply |
-| Indeed 自动申请 | P2 | 表单填写自动化 |
-| 更好的评分说明 | P1 | Scout Agent 提供更详细的推理 |
+| 功能 | 优先级 | 状态 | 备注 |
+|---|---|---|---|
+| 简历 PDF 导出 | P1 | ✅ 完成 | WeasyPrint + Jinja2，`templates/resume.html` |
+| 前端 PDF 下载按钮 | P1 | ✅ 完成 | Jobs 页面"Download PDF"按钮 |
+| LinkedIn RSS 无登录抓取 | P2 | ✅ 完成 | `scrapers/linkedin_rss.py` + `/api/scrapers/linkedin-rss` |
+| 移动端响应式 UI | P1 | 🔲 待开发 | 可折叠侧边栏，触控友好 |
+| 职位备注/标签 | P2 | 🔲 待开发 | 用户自定义标签 |
+| 多简历档案 | P2 | 🔲 待开发 | 针对不同职位类型使用不同档案 |
+| Seek 自动申请 | P2 | 🔲 待开发 | 通过 Playwright 自动化一键 Easy Apply |
+| Indeed 自动申请 | P2 | 🔲 待开发 | 表单填写自动化 |
+| 更好的评分说明 | P1 | 🔲 待开发 | Scout Agent 提供更详细的推理 |
 
 ### v2.2 — 中期规划
 
@@ -1055,8 +1057,8 @@ templates/
 
 | ID | 功能 | 优先级 | 状态 |
 |---|---|---|---|
-| F-28 | 基于 Tailor Agent 输出自动生成定制 PDF 简历 | P1 | 🔲 待开发 |
-| F-29 | 通过 UI 下载定制 PDF 简历 | P1 | 🔲 待开发 |
+| F-28 | 基于 Tailor Agent 输出自动生成定制 PDF 简历 | P1 | ✅ 完成 |
+| F-29 | 通过 UI 下载定制 PDF 简历 | P1 | ✅ 完成 |
 
 ### C.7 注意事项
 
@@ -1142,33 +1144,30 @@ templates/
 
 ```
 backend/app/
-├── agents/parser.py        ✅ 已实现，禁止修改核心逻辑
-├── agents/scout.py         ✅ 已实现，禁止修改核心逻辑
-├── agents/tailor.py        ✅ 已实现，禁止修改核心逻辑
-├── agents/cover_letter.py  ✅ 已实现，禁止修改核心逻辑
-├── scrapers/seek.py        ✅ 已实现，禁止修改
-├── scrapers/indeed.py      ✅ 已实现，禁止修改
-├── scrapers/linkedin.py    ✅ 已实现（URL模式），允许扩展 RSS
-├── models/                 ✅ 全部已实现，禁止修改表结构
-├── routers/jobs.py         ✅ 已实现，允许新增端点，禁止修改现有端点签名
-├── routers/profile.py      ✅ 已实现，禁止修改
-├── routers/scrapers.py     ✅ 已实现，禁止修改
-├── routers/notifications.py ✅ 已实现，禁止修改
-├── routers/settings.py     ✅ 已实现，禁止修改
-├── routers/dashboard.py    ✅ 已实现，禁止修改
-├── main.py                 ✅ 已实现，只允许注册新 router
-├── config.py               ✅ 已实现，允许新增变量，禁止修改现有变量
-└── database.py             ✅ 已实现，禁止修改
+├── agents/parser.py           ✅ 已实现，禁止修改核心逻辑
+├── agents/scout.py            ✅ 已实现，禁止修改核心逻辑
+├── agents/tailor.py           ✅ 已实现，禁止修改核心逻辑
+├── agents/cover_letter.py     ✅ 已实现，禁止修改核心逻辑
+├── scrapers/seek.py           ✅ 已实现，禁止修改
+├── scrapers/indeed.py         ✅ 已实现，禁止修改
+├── scrapers/linkedin.py       ✅ 已实现（URL模式），禁止修改
+├── scrapers/linkedin_rss.py   ✅ 已实现（RSS模式），禁止修改
+├── models/                    ✅ 全部已实现，禁止修改表结构
+├── routers/jobs.py            ✅ 已实现，允许新增端点，禁止修改现有端点签名
+├── routers/profile.py         ✅ 已实现，禁止修改
+├── routers/scrapers.py        ✅ 已实现（含 /linkedin-rss），禁止修改
+├── routers/notifications.py   ✅ 已实现，禁止修改
+├── routers/settings.py        ✅ 已实现，禁止修改
+├── routers/dashboard.py       ✅ 已实现，禁止修改
+├── routers/files.py           ✅ 已实现，禁止修改
+├── pdf_generator.py           ✅ 已实现，禁止修改
+├── main.py                    ✅ 已实现，只允许注册新 router
+├── config.py                  ✅ 已实现，允许新增变量，禁止修改现有变量
+└── database.py                ✅ 已实现，禁止修改
 
-frontend/src/               ✅ 全部已实现，禁止修改现有页面逻辑
-backend/tests/              ✅ 106个测试，禁止删除或修改现有测试
-
-待新建（Agent 的工作范围）：
-├── backend/app/pdf_generator.py        🔲 新建
-├── backend/app/routers/files.py        🔲 新建
-├── backend/app/scrapers/linkedin_rss.py 🔲 新建
-├── templates/resume.html               🔲 新建
-└── backend/tests/test_pdf_generator.py 🔲 新建
+frontend/src/                  ✅ 全部已实现，禁止修改现有页面逻辑
+templates/resume.html          ✅ 已实现，禁止修改
+backend/tests/                 ✅ 含 test_pdf_generator.py 和 test_linkedin_rss.py，禁止删除或修改现有测试
 ```
 
 ---

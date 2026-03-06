@@ -212,8 +212,15 @@ export default function Jobs() {
       const r = await api.get(`/api/jobs/${job.id}`)
       setSelected(r.data)
       const versions: ResumeVersion[] = r.data.resume_versions ?? []
-      if (versions.length > 0) setResume(versions[0])
+      if (versions.length > 0) {
+        setResume(versions[0])
+        setPdfUrl(`/api/files/${job.id}/resume.pdf`)
+      }
     } catch { /* silent */ }
+    try {
+      const cl = await api.get(`/api/jobs/${job.id}/cover-letter`)
+      setCoverLetter(`Subject: ${cl.data.subject_line}\n\n${cl.data.body}`)
+    } catch { /* no cover letter yet */ }
   }
 
   async function updateStatus(jobId: string, status: string) {
@@ -252,12 +259,13 @@ export default function Jobs() {
     setActionLoading('apply')
     setActionMsg('')
     try {
-      const r = await api.post(`/api/jobs/${jobId}/apply`)
-      if (r.data.cover_letter_text) setCoverLetter(r.data.cover_letter_text)
-      setActionMsg('✅ Applied! Cover letter ready below.')
+      const r = await api.post(`/api/jobs/${jobId}/cover-letter`)
+      const text = `Subject: ${r.data.subject_line}\n\n${r.data.body}`
+      setCoverLetter(text)
+      setActionMsg('✅ Cover letter ready below.')
       await fetchJobs()
     } catch (e: unknown) {
-      setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Apply failed')
+      setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Generate cover letter failed')
     } finally { setActionLoading(null) }
   }
 
@@ -315,6 +323,16 @@ export default function Jobs() {
                   <h2 className="text-xl font-bold text-gray-900">{selected.title || 'Untitled'}</h2>
                   <p className="text-gray-500">{selected.company}{selected.location ? ` · ${selected.location}` : ''}</p>
                   {selected.salary_range && <p className="text-sm text-gray-400 mt-0.5">{selected.salary_range}</p>}
+                  {selected.source_url && (
+                    <a
+                      href={selected.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-1 text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+                    >
+                      🔗 View original posting
+                    </a>
+                  )}
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium shrink-0 ${STATUS_COLORS[selected.status] ?? 'bg-gray-100'}`}>
                   {selected.status}
@@ -369,7 +387,7 @@ export default function Jobs() {
                     ⬇ Download PDF
                   </a>
                 )}
-                <ActionButton label={actionLoading === 'apply' ? 'Applying…' : '📤 Apply'} onClick={() => apply(selected.id)} loading={actionLoading === 'apply'} variant="success" />
+                <ActionButton label={actionLoading === 'apply' ? 'Generating…' : '📧 Cover Letter'} onClick={() => apply(selected.id)} loading={actionLoading === 'apply'} />
               </div>
 
               {actionMsg && (
