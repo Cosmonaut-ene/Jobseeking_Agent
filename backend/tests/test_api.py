@@ -549,15 +549,6 @@ class TestResumeParser:
 
 
 class TestNotificationsAPI:
-    def test_linkedin_cookies_status(self, client, tmp_path, monkeypatch):
-        """GET /api/notifications/linkedin-cookies-status should return status."""
-        monkeypatch.setattr("backend.app.config.COOKIES_DIR", tmp_path)
-        response = client.get("/api/notifications/linkedin-cookies-status")
-        assert response.status_code == 200
-        data = response.json()
-        assert "has_cookies" in data
-        assert data["has_cookies"] is False  # No cookies in tmp_path
-
     def test_test_notification_without_webhook(self, client, monkeypatch):
         """POST /api/notifications/test without webhook should return 400."""
         from backend.app import notifications
@@ -598,9 +589,3 @@ class TestNotificationsAPI:
         task_data = task_response.json()
         assert "status" in task_data
 
-    def test_linkedin_cookies_status_has_boolean(self, client, tmp_path, monkeypatch):
-        """linkedin-cookies-status has_cookies value should be a boolean."""
-        monkeypatch.setattr("backend.app.config.COOKIES_DIR", tmp_path)
-        response = client.get("/api/notifications/linkedin-cookies-status")
-        data = response.json()
-        assert isinstance(data["has_cookies"], bool)

@@ -19,14 +19,6 @@ export default function Notifications() {
   const [triggering, setTriggering] = useState(false)
   const [taskId, setTaskId] = useState<string | null>(null)
   const [task, setTask] = useState<TaskResult | null>(null)
-  const [cookiesStatus, setCookiesStatus] = useState<{ has_cookies: boolean } | null>(null)
-  const [uploadingCookies, setUploadingCookies] = useState(false)
-  const [cookiesMsg, setCookiesMsg] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.get('/api/notifications/linkedin-cookies-status').then(r => setCookiesStatus(r.data)).catch(() => {})
-  }, [])
-
   useEffect(() => {
     if (!taskId || task?.status === 'done' || task?.status === 'error') return
     const interval = setInterval(() => {
@@ -62,53 +54,9 @@ export default function Notifications() {
     }
   }
 
-  const uploadCookies = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploadingCookies(true)
-    setCookiesMsg(null)
-    const formData = new FormData()
-    formData.append('file', file)
-    try {
-      await api.post('/api/notifications/upload-linkedin-cookies', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-      setCookiesMsg('✅ Cookies 上传成功！')
-      const r = await api.get('/api/notifications/linkedin-cookies-status')
-      setCookiesStatus(r.data)
-    } catch (e: any) {
-      setCookiesMsg(`❌ 上传失败: ${e.response?.data?.detail || e.message}`)
-    } finally {
-      setUploadingCookies(false)
-      e.target.value = ''
-    }
-  }
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">通知 & 自动爬取</h1>
-
-      {/* LinkedIn Cookies */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-3">LinkedIn 自动爬虫 (Cookie 认证)</h2>
-        <div className="flex items-center gap-3 mb-4">
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-            cookiesStatus?.has_cookies
-              ? 'bg-green-100 text-green-800'
-              : 'bg-yellow-100 text-yellow-800'
-          }`}>
-            {cookiesStatus?.has_cookies ? '✅ Cookies 已配置' : '⚠️ 未配置 Cookies'}
-          </span>
-        </div>
-        <p className="text-sm text-gray-600 mb-4">
-          上传 LinkedIn cookies JSON 文件以启用自动爬取。使用浏览器扩展 (如 EditThisCookie) 导出 cookies。
-        </p>
-        <label className="cursor-pointer bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2 rounded border border-blue-200 text-sm font-medium inline-block">
-          {uploadingCookies ? '上传中...' : '📁 上传 Cookies JSON'}
-          <input type="file" accept=".json" onChange={uploadCookies} className="hidden" disabled={uploadingCookies} />
-        </label>
-        {cookiesMsg && <p className="mt-2 text-sm">{cookiesMsg}</p>}
-      </div>
 
       {/* Manual Trigger */}
       <div className="bg-white rounded-lg shadow p-6">
