@@ -10,7 +10,6 @@ BASE_DIR = Path(__file__).parents[2]  # Jobseeking_Agent/
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "db" / "jobseeking.db"
 PROFILE_PATH = DATA_DIR / "user_profile.json"
-COOKIES_DIR = DATA_DIR / "cookies"
 RESUMES_DIR = DATA_DIR / "resumes"
 COVER_LETTERS_DIR = DATA_DIR / "cover_letters"
 

@@ -117,11 +117,12 @@ export interface TaskStatus {
 }
 
 export interface DashboardStats {
-  job_counts: Record<string, number>
+  by_status: Record<string, number>
   total_jobs: number
-  total_applications: number
   high_score_count?: number
   mid_score_count?: number
+  recent_jobs_7d?: number
+  by_source?: Record<string, number>
 }
 
 export interface AdvisorReport {

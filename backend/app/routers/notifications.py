@@ -6,11 +6,9 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
-from fastapi.encoders import jsonable_encoder
+from fastapi import APIRouter, HTTPException
 
 from backend.app import notifications
-from backend.app.config import COOKIES_DIR
 
 router = APIRouter(tags=["notifications"])
 
@@ -53,16 +51,3 @@ def get_task(task_id: str) -> dict:
     return _tasks[task_id]
 
 
-@router.get("/notifications/linkedin-cookies-status")
-def linkedin_cookies_status() -> dict:
-    from backend.app.scrapers.linkedin import LinkedInAutoScraper
-    scraper = LinkedInAutoScraper()
-    return {"has_cookies": scraper.has_cookies}
-
-
-@router.post("/notifications/upload-linkedin-cookies")
-async def upload_linkedin_cookies(file: UploadFile = File(...)) -> dict:
-    COOKIES_DIR.mkdir(parents=True, exist_ok=True)
-    content = await file.read()
-    (COOKIES_DIR / "linkedin.json").write_bytes(content)
-    return {"saved": True}

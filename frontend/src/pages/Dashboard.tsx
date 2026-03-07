@@ -14,7 +14,7 @@ const STAT_CARDS = [
 export default function Dashboard() {
   const navigate = useNavigate()
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [followups, setFollowups] = useState<{ application: Record<string, unknown>; job_title: string; company: string }[]>([])
+  const [followups, setFollowups] = useState<{ application: Record<string, unknown>; job: Record<string, string> | null; overdue_days: number }[]>([])
   const [report, setReport] = useState<AdvisorReport | null>(null)
   const [loadingReport, setLoadingReport] = useState(false)
   const [reportError, setReportError] = useState('')
@@ -28,7 +28,7 @@ export default function Dashboard() {
     setLoadingReport(true)
     setReportError('')
     try {
-      const r = await api.post('/api/dashboard/advisor')
+      const r = await api.get('/api/dashboard/advisor')
       setReport(r.data)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to generate report'
@@ -55,7 +55,7 @@ export default function Dashboard() {
         {STAT_CARDS.map(({ key, label, color }) => (
           <div key={key} className="bg-white rounded-lg shadow p-4 text-center">
             <div className={`text-2xl font-bold text-white ${color} rounded-lg py-2 mb-2`}>
-              {stats?.job_counts?.[key] ?? 0}
+              {stats?.by_status?.[key] ?? 0}
             </div>
             <p className="text-sm text-gray-600">{label}</p>
           </div>
@@ -66,9 +66,8 @@ export default function Dashboard() {
       {stats && (
         <div className="flex flex-wrap gap-6 mb-8 text-sm text-gray-600">
           <span>Total jobs: <strong className="text-gray-900">{stats.total_jobs}</strong></span>
-          <span>Applications: <strong className="text-gray-900">{stats.total_applications}</strong></span>
-          <span>Dismissed: <strong className="text-gray-900">{stats.job_counts?.dismissed ?? 0}</strong></span>
-          <span>Rejected: <strong className="text-gray-900">{stats.job_counts?.rejected ?? 0}</strong></span>
+          <span>Dismissed: <strong className="text-gray-900">{stats.by_status?.dismissed ?? 0}</strong></span>
+          <span>Rejected: <strong className="text-gray-900">{stats.by_status?.rejected ?? 0}</strong></span>
           {stats.high_score_count !== undefined && (
             <span>High score (≥80%): <strong className="text-green-700">{stats.high_score_count}</strong></span>
           )}
@@ -95,8 +94,8 @@ export default function Dashboard() {
             <tbody className="divide-y divide-gray-100">
               {followups.map((f, i) => (
                 <tr key={i} className="hover:bg-gray-50">
-                  <td className="px-5 py-2">{f.job_title || '—'}</td>
-                  <td className="px-5 py-2">{f.company || '—'}</td>
+                  <td className="px-5 py-2">{(f.job as Record<string, string> | null)?.title || '—'}</td>
+                  <td className="px-5 py-2">{(f.job as Record<string, string> | null)?.company || '—'}</td>
                   <td className="px-5 py-2 text-orange-600">
                     {String(f.application.follow_up_date ?? '—')}
                   </td>

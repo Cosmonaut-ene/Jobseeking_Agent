@@ -14,7 +14,6 @@ from backend.app.agents.scout import ScoutAgent
 from backend.app.database import engine
 from backend.app.models.job import Job
 from backend.app.models.user_profile import UserProfile
-from backend.app.scrapers.linkedin import LinkedInAutoScraper
 from backend.app.scrapers.seek import SeekScraper
 from backend.app.scrapers.indeed import IndeedScraper
 
@@ -22,6 +21,11 @@ router = APIRouter(tags=["scrapers"])
 
 _tasks: dict[str, dict[str, Any]] = {}
 PROFILE_PATH = Path("data/user_profile.json")
+
+
+def _task_view(task: dict) -> dict:
+    """Return task dict without internal fields (e.g. cancel_event)."""
+    return {k: v for k, v in task.items() if k != "cancel_event"}
 
 
 def _require_api_key() -> None:
@@ -43,6 +47,7 @@ class SeekRequest(BaseModel):
 
 def _run_seek(task_id: str, roles: list[str], locations: list[str], max_per_query: int) -> None:
     _tasks[task_id].update(status="running", progress="Loading user profile...")
+    cancel = _tasks[task_id]["cancel_event"]
     try:
         profile = UserProfile.load(PROFILE_PATH)
         existing = _existing_urls()
@@ -54,6 +59,9 @@ def _run_seek(task_id: str, roles: list[str], locations: list[str], max_per_quer
         scout = ScoutAgent()
         results: list[dict] = []
         for i, sj in enumerate(scraped):
+            if cancel.is_set():
+                _tasks[task_id].update(status="cancelled", progress=f"Cancelled — {len(results)} job(s) saved.", results=results)
+                return
             _tasks[task_id]["progress"] = f"Analysing {i+1}/{len(scraped)}: {sj.title or sj.url}"
             job = scout.run(raw_jd=sj.raw_jd, user_profile=profile, source="seek",
                             source_url=sj.url, title=sj.title, company=sj.company,
@@ -70,7 +78,7 @@ def _run_seek(task_id: str, roles: list[str], locations: list[str], max_per_quer
 def start_seek(req: SeekRequest) -> dict:
     _require_api_key()
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"status": "pending", "progress": "Queued"}
+    _tasks[task_id] = {"status": "pending", "progress": "Queued", "cancel_event": threading.Event()}
     threading.Thread(target=_run_seek, args=(task_id, req.roles, req.locations, req.max_per_query), daemon=True).start()
     return {"task_id": task_id}
 
@@ -83,6 +91,7 @@ class IndeedRequest(BaseModel):
 
 def _run_indeed(task_id: str, roles: list[str], locations: list[str], max_per_query: int) -> None:
     _tasks[task_id].update(status="running", progress="Loading user profile...")
+    cancel = _tasks[task_id]["cancel_event"]
     try:
         profile = UserProfile.load(PROFILE_PATH)
         existing = _existing_urls()
@@ -94,6 +103,9 @@ def _run_indeed(task_id: str, roles: list[str], locations: list[str], max_per_qu
         scout = ScoutAgent()
         results: list[dict] = []
         for i, sj in enumerate(scraped):
+            if cancel.is_set():
+                _tasks[task_id].update(status="cancelled", progress=f"Cancelled — {len(results)} job(s) saved.", results=results)
+                return
             _tasks[task_id]["progress"] = f"Analysing {i+1}/{len(scraped)}: {sj.title or sj.url}"
             job = scout.run(raw_jd=sj.raw_jd, user_profile=profile, source="indeed",
                             source_url=sj.url, title=sj.title, company=sj.company,
@@ -110,91 +122,8 @@ def _run_indeed(task_id: str, roles: list[str], locations: list[str], max_per_qu
 def start_indeed(req: IndeedRequest) -> dict:
     _require_api_key()
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"status": "pending", "progress": "Queued"}
+    _tasks[task_id] = {"status": "pending", "progress": "Queued", "cancel_event": threading.Event()}
     threading.Thread(target=_run_indeed, args=(task_id, req.roles, req.locations, req.max_per_query), daemon=True).start()
-    return {"task_id": task_id}
-
-
-class LinkedInAutoRequest(BaseModel):
-    keywords: list[str]
-    location: str
-    max_results: int = 25
-
-
-class LinkedInURLRequest(BaseModel):
-    urls: list[str]
-
-
-def _run_linkedin_auto(task_id: str, keywords: list[str], location: str, max_results: int) -> None:
-    _tasks[task_id].update(status="running", progress="Loading cookies...")
-    try:
-        profile = UserProfile.load(PROFILE_PATH)
-        existing = _existing_urls()
-        li = LinkedInAutoScraper()
-        if not li.has_cookies:
-            _tasks[task_id].update(status="error", progress="No LinkedIn cookies found. Upload cookies first.", error="No cookies")
-            return
-        _tasks[task_id]["progress"] = "Searching LinkedIn..."
-        scraped = li.scrape_search(keywords, location, max_results, existing)
-        if not scraped:
-            _tasks[task_id].update(status="done", progress="No new jobs found.", results=[])
-            return
-        scout = ScoutAgent()
-        results: list[dict] = []
-        for i, sj in enumerate(scraped):
-            _tasks[task_id]["progress"] = f"Analysing {i+1}/{len(scraped)}: {sj.title or sj.url}"
-            job = scout.run(raw_jd=sj.raw_jd, user_profile=profile, source="linkedin",
-                            source_url=sj.url, title=sj.title, company=sj.company,
-                            location=sj.location, auto_filter=True, notify=True)
-            if job:
-                results.append(jsonable_encoder(job))
-        _tasks[task_id].update(status="done", progress=f"Done — {len(results)} job(s) saved.", results=results)
-    except Exception as exc:
-        _tasks[task_id].update(status="error", progress=str(exc), error=str(exc))
-
-
-@router.post("/scrapers/linkedin")
-def start_linkedin(req: LinkedInAutoRequest) -> dict:
-    _require_api_key()
-    task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"status": "pending", "progress": "Queued"}
-    threading.Thread(target=_run_linkedin_auto, args=(task_id, req.keywords, req.location, req.max_results), daemon=True).start()
-    return {"task_id": task_id}
-
-
-def _run_linkedin_urls(task_id: str, urls: list[str]) -> None:
-    _tasks[task_id].update(status="running", progress="Loading user profile...")
-    try:
-        profile = UserProfile.load(PROFILE_PATH)
-        existing = _existing_urls()
-        li = LinkedInAutoScraper()
-        _tasks[task_id]["progress"] = "Fetching job pages..."
-        scraped = li.scrape_urls(urls, existing)
-        if not scraped:
-            _tasks[task_id].update(status="done", progress="No jobs extracted.", results=[])
-            return
-        scout = ScoutAgent()
-        results: list[dict] = []
-        for i, sj in enumerate(scraped):
-            _tasks[task_id]["progress"] = f"Analysing {i+1}/{len(scraped)}: {sj.title or sj.url}"
-            job = scout.run(raw_jd=sj.raw_jd, user_profile=profile, source="linkedin",
-                            source_url=sj.url, title=sj.title, company=sj.company,
-                            location=sj.location, auto_filter=True, notify=True)
-            if job:
-                results.append(jsonable_encoder(job))
-        _tasks[task_id].update(status="done", progress=f"Done — {len(results)} job(s) saved.", results=results)
-    except Exception as exc:
-        _tasks[task_id].update(status="error", progress=str(exc), error=str(exc))
-
-
-@router.post("/scrapers/linkedin-urls")
-def start_linkedin_urls(req: LinkedInURLRequest) -> dict:
-    _require_api_key()
-    if not req.urls:
-        raise HTTPException(400, "No URLs provided.")
-    task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"status": "pending", "progress": "Queued"}
-    threading.Thread(target=_run_linkedin_urls, args=(task_id, req.urls), daemon=True).start()
     return {"task_id": task_id}
 
 
@@ -207,6 +136,7 @@ class LinkedInRSSRequest(BaseModel):
 def _run_linkedin_rss(task_id: str, keywords: list[str], location: str, max_results: int) -> None:
     import asyncio
     _tasks[task_id].update(status="running", progress="Loading user profile...")
+    cancel = _tasks[task_id]["cancel_event"]
     try:
         profile = UserProfile.load(PROFILE_PATH)
         existing = _existing_urls()
@@ -219,6 +149,9 @@ def _run_linkedin_rss(task_id: str, keywords: list[str], location: str, max_resu
         scout = ScoutAgent()
         results: list[dict] = []
         for i, sj in enumerate(scraped):
+            if cancel.is_set():
+                _tasks[task_id].update(status="cancelled", progress=f"Cancelled — {len(results)} job(s) saved.", results=results)
+                return
             _tasks[task_id]["progress"] = f"Analysing {i+1}/{len(scraped)}: {sj.title or sj.url}"
             job = scout.run(raw_jd=sj.raw_jd, user_profile=profile, source="linkedin_rss",
                             source_url=sj.url, title=sj.title, company=sj.company,
@@ -234,7 +167,7 @@ def _run_linkedin_rss(task_id: str, keywords: list[str], location: str, max_resu
 def start_linkedin_rss(req: LinkedInRSSRequest) -> dict:
     _require_api_key()
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"status": "pending", "progress": "Queued"}
+    _tasks[task_id] = {"status": "pending", "progress": "Queued", "cancel_event": threading.Event()}
     threading.Thread(target=_run_linkedin_rss, args=(task_id, req.keywords, req.location, req.max_results), daemon=True).start()
     return {"task_id": task_id}
 
@@ -243,4 +176,16 @@ def start_linkedin_rss(req: LinkedInRSSRequest) -> dict:
 def get_task(task_id: str) -> dict:
     if task_id not in _tasks:
         raise HTTPException(404, "Task not found")
-    return _tasks[task_id]
+    return _task_view(_tasks[task_id])
+
+
+@router.delete("/tasks/{task_id}")
+def cancel_task(task_id: str) -> dict:
+    if task_id not in _tasks:
+        raise HTTPException(404, "Task not found")
+    task = _tasks[task_id]
+    if task["status"] not in ("pending", "running"):
+        raise HTTPException(400, f"Task already {task['status']}")
+    task["cancel_event"].set()
+    task.update(status="cancelled", progress="Cancelling...")
+    return {"ok": True}

@@ -147,6 +147,25 @@ def tailor_job(job_id: str) -> dict:
         raise HTTPException(500, detail=str(e))
 
 
+@router.get("/jobs/{job_id}/cover-letter")
+def get_cover_letter(job_id: str) -> dict:
+    from backend.app.config import COVER_LETTERS_DIR
+    with Session(engine) as session:
+        job = session.get(Job, job_id)
+        if not job:
+            raise HTTPException(404, "Job not found")
+    safe_company = "".join(c if c.isalnum() else "_" for c in job.company)
+    safe_title = "".join(c if c.isalnum() else "_" for c in job.title)
+    filename = f"{safe_company}_{safe_title}_{job_id[:8]}.txt"
+    path = COVER_LETTERS_DIR / filename
+    if not path.exists():
+        raise HTTPException(404, "Cover letter not found")
+    content = path.read_text(encoding="utf-8")
+    first_line, _, rest = content.partition("\n\n")
+    subject = first_line.removeprefix("Subject: ")
+    return {"subject_line": subject, "body": rest}
+
+
 @router.post("/jobs/{job_id}/cover-letter")
 def generate_cover_letter(job_id: str) -> dict:
     _require_api_key()

@@ -11,7 +11,6 @@ from backend.app.models.job import Job, JobStatus
 from backend.app.models.user_profile import UserProfile
 from backend.app.scrapers.seek import SeekScraper
 from backend.app.scrapers.indeed import IndeedScraper
-from backend.app.scrapers.linkedin import LinkedInAutoScraper
 from backend.app.config import DEFAULT_MAX_JOBS
 
 logger = logging.getLogger(__name__)
@@ -103,20 +102,10 @@ def run_daily_scout(settings: dict | None = None) -> dict[str, Any]:
 
     # --- LinkedIn ---
     try:
+        import asyncio
+        from backend.app.scrapers.linkedin_rss import scrape_linkedin_rss
         logger.info("[Scheduler] Starting LinkedIn scraper...")
-        li_scraper = LinkedInAutoScraper()
-        if li_scraper.has_cookies:
-            scraped = li_scraper.scrape_search(roles, locations[0] if locations else "Australia", max_jobs, existing)
-        else:
-            logger.warning("[LinkedIn] No cookies — trying LinkedIn RSS fallback...")
-            import asyncio
-            from backend.app.scrapers.linkedin_rss import scrape_linkedin_rss
-            try:
-                scraped = asyncio.run(scrape_linkedin_rss(roles, locations[0] if locations else "Australia", max_jobs, existing))
-                stats["linkedin_rss"] = len(scraped)
-            except Exception as rss_err:
-                logger.warning("[LinkedIn RSS] Fallback failed: %s", rss_err)
-                scraped = []
+        scraped = asyncio.run(scrape_linkedin_rss(roles, locations[0] if locations else "Australia", max_jobs, existing))
         stats["linkedin"] = len(scraped)
         for sj in scraped:
             job = scout.run(

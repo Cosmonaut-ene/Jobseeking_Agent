@@ -27,6 +27,25 @@ interface TailoredContent {
   experience?: TailoredExperience[]
 }
 
+// ── Copy button ───────────────────────────────────────────────────────────────
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  function copy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    })
+  }
+  return (
+    <button
+      onClick={copy}
+      className="ml-2 px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+    >
+      {copied ? '✓' : 'Copy'}
+    </button>
+  )
+}
+
 // ── Full resume viewer ────────────────────────────────────────────────────────
 function ResumePanel({ resume }: { resume: ResumeVersion }) {
   const content = resume.content_json as TailoredContent
@@ -51,7 +70,9 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
         {/* Summary */}
         {content.summary && (
           <section>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Summary</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1 flex items-center">
+              Summary<CopyBtn text={content.summary} />
+            </h4>
             <p className="text-gray-800 leading-relaxed">{content.summary}</p>
           </section>
         )}
@@ -59,7 +80,9 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
         {/* Skills */}
         {content.skills && content.skills.length > 0 && (
           <section>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Selected Skills</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5 flex items-center">
+              Selected Skills<CopyBtn text={content.skills.join(', ')} />
+            </h4>
             <div className="flex flex-wrap gap-1.5">
               {content.skills.map((s, i) => (
                 <span key={i} className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs">{s}</span>
@@ -75,7 +98,10 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
             <div className="space-y-3">
               {content.projects.map((proj, i) => (
                 <div key={i}>
-                  <p className="font-medium text-gray-800 mb-1">{proj.name}</p>
+                  <p className="font-medium text-gray-800 mb-1 flex items-center">
+                    {proj.name}
+                    <CopyBtn text={proj.bullets.map(b => `• ${b.rewritten}`).join('\n')} />
+                  </p>
                   <ul className="space-y-1.5 pl-2">
                     {proj.bullets.map((b, j) => (
                       <li key={j} className="text-gray-700 leading-snug">
@@ -105,7 +131,10 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
             <div className="space-y-2">
               {content.experience.map((exp, i) => (
                 <div key={i}>
-                  <p className="font-medium text-gray-800">{exp.role} <span className="text-gray-500 font-normal">@ {exp.company}</span></p>
+                  <p className="font-medium text-gray-800 flex items-center">
+                    {exp.role} <span className="text-gray-500 font-normal ml-1">@ {exp.company}</span>
+                    <CopyBtn text={(exp.bullets ?? []).map(b => `• ${b}`).join('\n')} />
+                  </p>
                   <p className="text-xs text-gray-400 mb-1">{exp.duration}</p>
                   <ul className="space-y-0.5 pl-2">
                     {(exp.bullets ?? []).map((b, j) => (
@@ -188,7 +217,7 @@ export default function Jobs() {
   const [resume, setResume] = useState<ResumeVersion | null>(null)
   const [coverLetter, setCoverLetter] = useState<string | null>(null)
   const [showJD, setShowJD] = useState(false)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [docxUrl, setDocxUrl] = useState<string | null>(null)
 
   useEffect(() => { fetchJobs() }, [])
 
@@ -206,14 +235,21 @@ export default function Jobs() {
     setActionMsg('')
     setResume(null)
     setCoverLetter(null)
-    setPdfUrl(null)
+    setDocxUrl(null)
     setShowJD(false)
     try {
       const r = await api.get(`/api/jobs/${job.id}`)
       setSelected(r.data)
       const versions: ResumeVersion[] = r.data.resume_versions ?? []
-      if (versions.length > 0) setResume(versions[0])
+      if (versions.length > 0) {
+        setResume(versions[0])
+        if (r.data.has_docx) setDocxUrl(`/api/files/${job.id}/resume.docx`)
+      }
     } catch { /* silent */ }
+    try {
+      const cl = await api.get(`/api/jobs/${job.id}/cover-letter`)
+      setCoverLetter(`Subject: ${cl.data.subject_line}\n\n${cl.data.body}`)
+    } catch { /* no cover letter yet */ }
   }
 
   async function updateStatus(jobId: string, status: string) {
@@ -241,7 +277,7 @@ export default function Jobs() {
     try {
       const r = await api.post(`/api/jobs/${jobId}/tailor`)
       setResume(r.data)
-      if (r.data.pdf_download_url) setPdfUrl(r.data.pdf_download_url)
+      if (r.data.docx_download_url) setDocxUrl(r.data.docx_download_url)
       setActionMsg('✅ Resume tailored!')
     } catch (e: unknown) {
       setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Tailor failed')
@@ -252,12 +288,13 @@ export default function Jobs() {
     setActionLoading('apply')
     setActionMsg('')
     try {
-      const r = await api.post(`/api/jobs/${jobId}/apply`)
-      if (r.data.cover_letter_text) setCoverLetter(r.data.cover_letter_text)
-      setActionMsg('✅ Applied! Cover letter ready below.')
+      const r = await api.post(`/api/jobs/${jobId}/cover-letter`)
+      const text = `Subject: ${r.data.subject_line}\n\n${r.data.body}`
+      setCoverLetter(text)
+      setActionMsg('✅ Cover letter ready below.')
       await fetchJobs()
     } catch (e: unknown) {
-      setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Apply failed')
+      setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Generate cover letter failed')
     } finally { setActionLoading(null) }
   }
 
@@ -315,6 +352,16 @@ export default function Jobs() {
                   <h2 className="text-xl font-bold text-gray-900">{selected.title || 'Untitled'}</h2>
                   <p className="text-gray-500">{selected.company}{selected.location ? ` · ${selected.location}` : ''}</p>
                   {selected.salary_range && <p className="text-sm text-gray-400 mt-0.5">{selected.salary_range}</p>}
+                  {selected.source_url && (
+                    <a
+                      href={selected.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 mt-1 text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
+                    >
+                      🔗 View original posting
+                    </a>
+                  )}
                 </div>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium shrink-0 ${STATUS_COLORS[selected.status] ?? 'bg-gray-100'}`}>
                   {selected.status}
@@ -360,16 +407,16 @@ export default function Jobs() {
                 <ActionButton label="✅ Approve" onClick={() => updateStatus(selected.id, 'reviewed')} loading={actionLoading === 'status'} variant="success" />
                 <ActionButton label="❌ Dismiss" onClick={() => updateStatus(selected.id, 'dismissed')} loading={actionLoading === 'status'} variant="danger" />
                 <ActionButton label={actionLoading === 'tailor' ? 'Tailoring…' : '✂️ Tailor Resume'} onClick={() => tailor(selected.id)} loading={actionLoading === 'tailor'} />
-                {pdfUrl && (
+                {docxUrl && (
                   <a
-                    href={pdfUrl}
+                    href={docxUrl}
                     download
                     className="px-3 py-1.5 rounded text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                   >
-                    ⬇ Download PDF
+                    ⬇ Download Word
                   </a>
                 )}
-                <ActionButton label={actionLoading === 'apply' ? 'Applying…' : '📤 Apply'} onClick={() => apply(selected.id)} loading={actionLoading === 'apply'} variant="success" />
+                <ActionButton label={actionLoading === 'apply' ? 'Generating…' : '📧 Cover Letter'} onClick={() => apply(selected.id)} loading={actionLoading === 'apply'} />
               </div>
 
               {actionMsg && (

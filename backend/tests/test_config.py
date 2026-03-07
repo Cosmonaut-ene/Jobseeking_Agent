@@ -7,7 +7,7 @@ from pathlib import Path
 class TestConfig:
     def test_config_imports(self):
         from backend.app.config import (
-            BASE_DIR, DATA_DIR, DB_PATH, PROFILE_PATH, COOKIES_DIR,
+            BASE_DIR, DATA_DIR, DB_PATH, PROFILE_PATH,
             RESUMES_DIR, COVER_LETTERS_DIR, HIGH_SCORE_THRESHOLD,
             MID_SCORE_THRESHOLD, SCHEDULER_HOUR, SCHEDULER_MINUTE,
             DEFAULT_MAX_JOBS,
