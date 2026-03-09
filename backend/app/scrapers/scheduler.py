@@ -10,7 +10,6 @@ from backend.app.database import engine, get_session
 from backend.app.models.job import Job, JobStatus
 from backend.app.models.user_profile import UserProfile
 from backend.app.scrapers.seek import SeekScraper
-from backend.app.scrapers.indeed import IndeedScraper
 from backend.app.config import DEFAULT_MAX_JOBS
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ def run_daily_scout(settings: dict | None = None) -> dict[str, Any]:
 
     existing = _existing_urls()
     scout = ScoutAgent()
-    stats: dict[str, int] = {"seek": 0, "indeed": 0, "linkedin": 0}
+    stats: dict[str, int] = {"seek": 0, "linkedin": 0}
     high_jobs: list[Job] = []
     mid_jobs: list[Job] = []
 
@@ -72,33 +71,6 @@ def run_daily_scout(settings: dict | None = None) -> dict[str, Any]:
                     mid_jobs.append(job)
     except Exception as e:
         logger.error("[Scheduler] Seek scraper failed: %s", e)
-
-    # --- Indeed ---
-    try:
-        logger.info("[Scheduler] Starting Indeed scraper...")
-        scraped = IndeedScraper().scrape(roles, locations, max_jobs, existing)
-        stats["indeed"] = len(scraped)
-        for sj in scraped:
-            job = scout.run(
-                raw_jd=sj.raw_jd,
-                user_profile=profile,
-                source="indeed",
-                source_url=sj.url,
-                title=sj.title,
-                company=sj.company,
-                location=sj.location,
-                salary_range=sj.salary,
-                auto_filter=True,
-                notify=True,
-            )
-            if job:
-                from backend.app.config import HIGH_SCORE_THRESHOLD
-                if job.match_score >= HIGH_SCORE_THRESHOLD:
-                    high_jobs.append(job)
-                else:
-                    mid_jobs.append(job)
-    except Exception as e:
-        logger.error("[Scheduler] Indeed scraper failed: %s", e)
 
     # --- LinkedIn ---
     try:
@@ -136,8 +108,8 @@ def run_daily_scout(settings: dict | None = None) -> dict[str, Any]:
 
     total_new = len(high_jobs) + len(mid_jobs)
     logger.info(
-        "[Scheduler] Daily scout complete: seek=%d, indeed=%d, linkedin=%d, saved=%d (high=%d, mid=%d)",
-        stats["seek"], stats["indeed"], stats["linkedin"],
+        "[Scheduler] Daily scout complete: seek=%d, linkedin=%d, saved=%d (high=%d, mid=%d)",
+        stats["seek"], stats["linkedin"],
         total_new, len(high_jobs), len(mid_jobs),
     )
 

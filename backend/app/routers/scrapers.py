@@ -15,7 +15,6 @@ from backend.app.database import engine
 from backend.app.models.job import Job
 from backend.app.models.user_profile import UserProfile
 from backend.app.scrapers.seek import SeekScraper
-from backend.app.scrapers.indeed import IndeedScraper
 
 router = APIRouter(tags=["scrapers"])
 
@@ -82,49 +81,6 @@ def start_seek(req: SeekRequest) -> dict:
     threading.Thread(target=_run_seek, args=(task_id, req.roles, req.locations, req.max_per_query), daemon=True).start()
     return {"task_id": task_id}
 
-
-class IndeedRequest(BaseModel):
-    roles: list[str]
-    locations: list[str]
-    max_per_query: int = 10
-
-
-def _run_indeed(task_id: str, roles: list[str], locations: list[str], max_per_query: int) -> None:
-    _tasks[task_id].update(status="running", progress="Loading user profile...")
-    cancel = _tasks[task_id]["cancel_event"]
-    try:
-        profile = UserProfile.load(PROFILE_PATH)
-        existing = _existing_urls()
-        _tasks[task_id]["progress"] = "Starting Playwright browser..."
-        scraped = IndeedScraper().scrape(roles, locations, max_per_query, existing)
-        if not scraped:
-            _tasks[task_id].update(status="done", progress="No new jobs found.", results=[])
-            return
-        scout = ScoutAgent()
-        results: list[dict] = []
-        for i, sj in enumerate(scraped):
-            if cancel.is_set():
-                _tasks[task_id].update(status="cancelled", progress=f"Cancelled — {len(results)} job(s) saved.", results=results)
-                return
-            _tasks[task_id]["progress"] = f"Analysing {i+1}/{len(scraped)}: {sj.title or sj.url}"
-            job = scout.run(raw_jd=sj.raw_jd, user_profile=profile, source="indeed",
-                            source_url=sj.url, title=sj.title, company=sj.company,
-                            location=sj.location, salary_range=sj.salary,
-                            auto_filter=True, notify=True)
-            if job:
-                results.append(jsonable_encoder(job))
-        _tasks[task_id].update(status="done", progress=f"Done — {len(results)} job(s) saved.", results=results)
-    except Exception as exc:
-        _tasks[task_id].update(status="error", progress=str(exc), error=str(exc))
-
-
-@router.post("/scrapers/indeed")
-def start_indeed(req: IndeedRequest) -> dict:
-    _require_api_key()
-    task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"status": "pending", "progress": "Queued", "cancel_event": threading.Event()}
-    threading.Thread(target=_run_indeed, args=(task_id, req.roles, req.locations, req.max_per_query), daemon=True).start()
-    return {"task_id": task_id}
 
 
 class LinkedInRSSRequest(BaseModel):

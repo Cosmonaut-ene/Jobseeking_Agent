@@ -55,14 +55,12 @@ def push_daily_summary(stats: dict, high_jobs: list[Job], mid_jobs: list[Job]) -
     today = date.today().isoformat()
 
     seek_count = stats.get("seek", 0)
-    indeed_count = stats.get("indeed", 0)
     linkedin_count = stats.get("linkedin", 0)
 
     text = (
         f"📊 <b>今日岗位报告 ({today})</b>\n\n"
         f"🔍 爬取统计:\n"
         f"   • Seek: {seek_count} 个新职位\n"
-        f"   • Indeed: {indeed_count} 个新职位\n"
         f"   • LinkedIn: {linkedin_count} 个新职位\n\n"
     )
 

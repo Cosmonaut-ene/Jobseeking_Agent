@@ -86,14 +86,13 @@ class TestNotifications:
         high_job = Job(source="seek", raw_jd="...", title="SWE", company="Google", match_score=0.85)
         mid_job = Job(source="indeed", raw_jd="...", title="Dev", company="Atlassian", match_score=0.75)
 
-        stats = {"seek": 15, "indeed": 10, "linkedin": 20}
+        stats = {"seek": 15, "linkedin": 20}
         result = notifications.push_daily_summary(stats, [high_job], [mid_job])
 
         assert result is True
         assert len(sent_messages) == 1
         msg = sent_messages[0]
         assert "Seek: 15" in msg
-        assert "Indeed: 10" in msg
         assert "LinkedIn: 20" in msg
         assert "Google" in msg
         assert "Atlassian" in msg
