@@ -156,11 +156,6 @@ export default function Scrapers() {
   const [seekMax, setSeekMax] = useState(10)
   const { task: seekTask, startTask: startSeekTask, cancelTask: cancelSeek } = usePersistentTask('scraper_seek_task')
 
-  // Indeed
-  const [indeedRoles, setIndeedRoles] = useState('Data Scientist, ML Engineer')
-  const [indeedLoc, setIndeedLoc] = useState('Sydney NSW')
-  const [indeedMax, setIndeedMax] = useState(10)
-  const { task: indeedTask, startTask: startIndeedTask, cancelTask: cancelIndeed } = usePersistentTask('scraper_indeed_task')
 
   // LinkedIn
   const [rssKeywords, setRssKeywords] = useState('Data Scientist, Machine Learning Engineer')
@@ -175,15 +170,6 @@ export default function Scrapers() {
       max_per_query: seekMax
     })
     startSeekTask(r.data.task_id)
-  }
-
-  const startIndeed = async () => {
-    const r = await api.post('/api/scrapers/indeed', {
-      roles: indeedRoles.split(',').map(s => s.trim()).filter(Boolean),
-      locations: [indeedLoc],
-      max_per_query: indeedMax
-    })
-    startIndeedTask(r.data.task_id)
   }
 
   const startLinkedInRss = async () => {
@@ -271,29 +257,6 @@ export default function Scrapers() {
           {seekTask?.status === 'running' ? '⏳ 爬取中...' : '🚀 开始爬取'}
         </button>
         <TaskStatus task={seekTask} onCancel={cancelSeek} />
-      </div>
-
-      {/* Indeed */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Indeed.com</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">职位关键词 (逗号分隔)</label>
-            <input className={inputCls} value={indeedRoles} onChange={e => setIndeedRoles(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">地点</label>
-            <input className={inputCls} value={indeedLoc} onChange={e => setIndeedLoc(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">最大数量</label>
-            <input className={inputCls} type="number" value={indeedMax} onChange={e => setIndeedMax(Number(e.target.value))} />
-          </div>
-        </div>
-        <button className={btnCls} onClick={startIndeed} disabled={indeedTask?.status === 'running'}>
-          {indeedTask?.status === 'running' ? '⏳ 爬取中...' : '🚀 开始爬取'}
-        </button>
-        <TaskStatus task={indeedTask} onCancel={cancelIndeed} />
       </div>
 
       {/* LinkedIn */}
