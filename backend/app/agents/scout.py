@@ -233,8 +233,21 @@ class ScoutAgent:
 
     def _evaluate(self, raw_jd: str, user_profile: UserProfile) -> dict:
         profile_text = user_profile.to_prompt_text()
-        return self._call(
+        raw = self._call(
             EVAL_SYSTEM,
             f"## Candidate Profile\n{profile_text}\n\n## Job Description\n{raw_jd}\n\nProvide the full 5-section evaluation.",
             EVAL_SCHEMA,
         )
+        # Normalise: Gemini may return null for required nested objects when it can't
+        # populate them. Use `or` (not .get default) so null values are replaced too.
+        return {
+            "ats_pct": raw.get("ats_pct") or 0,
+            "strong_matches": raw.get("strong_matches") or [],
+            "missing_skills": raw.get("missing_skills") or [],
+            "unmet_requirements": raw.get("unmet_requirements") or [],
+            "notes": raw.get("notes") or "",
+            "skills_improvements": raw.get("skills_improvements") or {},
+            "resume_improvements": raw.get("resume_improvements") or {},
+            "formatting_improvements": raw.get("formatting_improvements") or {},
+            "recommendations": raw.get("recommendations") or {},
+        }
