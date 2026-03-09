@@ -17,7 +17,7 @@ def make_profile():
 
 
 def _make_scout_with_mocked_calls(score: float, parse_result: dict | None = None):
-    """Create a ScoutAgent with mocked _parse_jd and _score methods."""
+    """Create a ScoutAgent with mocked _parse_jd and _evaluate methods."""
     from backend.app.agents.scout import ScoutAgent
 
     agent = ScoutAgent.__new__(ScoutAgent)
@@ -31,15 +31,20 @@ def _make_scout_with_mocked_calls(score: float, parse_result: dict | None = None
         "skills_required": ["Python", "SQL"],
     }
 
-    score_result = {
-        "match_score": score,
+    eval_result = {
+        "ats_pct": int(round(score * 100)),
         "strong_matches": ["Python", "ML"],
         "missing_skills": ["Kubernetes"],
+        "unmet_requirements": [],
         "notes": "Good match",
+        "skills_improvements": {"technical": [], "certifications": [], "soft_skills": [], "tools": []},
+        "resume_improvements": {"bullet_strength": [], "achievements_feedback": "", "metrics_suggestions": [], "ats_keywords": []},
+        "formatting_improvements": {"tone_clarity": [], "action_verbs": [], "layout": []},
+        "recommendations": {"top_5": [], "quick_wins": [], "deeper_improvements": [], "estimated_improvement_pct": 0},
     }
 
     agent._parse_jd = MagicMock(return_value=parse_result or default_parse)
-    agent._score = MagicMock(return_value=score_result)
+    agent._evaluate = MagicMock(return_value=eval_result)
     return agent
 
 
