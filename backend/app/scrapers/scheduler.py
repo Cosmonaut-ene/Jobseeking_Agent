@@ -75,9 +75,9 @@ def run_daily_scout(settings: dict | None = None) -> dict[str, Any]:
     # --- LinkedIn ---
     try:
         import asyncio
-        from backend.app.scrapers.linkedin_rss import scrape_linkedin_rss
+        from backend.app.scrapers.linkedin_guest import scrape_linkedin_guest
         logger.info("[Scheduler] Starting LinkedIn scraper...")
-        scraped = asyncio.run(scrape_linkedin_rss(roles, locations[0] if locations else "Australia", max_jobs, existing))
+        scraped = asyncio.run(scrape_linkedin_guest(roles, locations[0] if locations else "Australia", max_jobs, existing))
         stats["linkedin"] = len(scraped)
         for sj in scraped:
             job = scout.run(

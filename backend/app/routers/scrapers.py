@@ -83,22 +83,22 @@ def start_seek(req: SeekRequest) -> dict:
 
 
 
-class LinkedInRSSRequest(BaseModel):
+class LinkedInRequest(BaseModel):
     keywords: list[str]
     location: str
     max_results: int = 25
 
 
-def _run_linkedin_rss(task_id: str, keywords: list[str], location: str, max_results: int) -> None:
+def _run_linkedin(task_id: str, keywords: list[str], location: str, max_results: int) -> None:
     import asyncio
     _tasks[task_id].update(status="running", progress="Loading user profile...")
     cancel = _tasks[task_id]["cancel_event"]
     try:
         profile = UserProfile.load(PROFILE_PATH)
         existing = _existing_urls()
-        _tasks[task_id]["progress"] = "Fetching LinkedIn RSS feed..."
-        from backend.app.scrapers.linkedin_rss import scrape_linkedin_rss
-        scraped = asyncio.run(scrape_linkedin_rss(keywords, location, max_results, existing))
+        _tasks[task_id]["progress"] = "Fetching LinkedIn jobs (guest API)..."
+        from backend.app.scrapers.linkedin_guest import scrape_linkedin_guest
+        scraped = asyncio.run(scrape_linkedin_guest(keywords, location, max_results, existing))
         if not scraped:
             _tasks[task_id].update(status="done", progress="No new jobs found.", results=[])
             return
@@ -109,7 +109,7 @@ def _run_linkedin_rss(task_id: str, keywords: list[str], location: str, max_resu
                 _tasks[task_id].update(status="cancelled", progress=f"Cancelled — {len(results)} job(s) saved.", results=results)
                 return
             _tasks[task_id]["progress"] = f"Analysing {i+1}/{len(scraped)}: {sj.title or sj.url}"
-            job = scout.run(raw_jd=sj.raw_jd, user_profile=profile, source="linkedin_rss",
+            job = scout.run(raw_jd=sj.raw_jd, user_profile=profile, source="linkedin",
                             source_url=sj.url, title=sj.title, company=sj.company,
                             location=sj.location, auto_filter=True, notify=True)
             if job:
@@ -119,12 +119,12 @@ def _run_linkedin_rss(task_id: str, keywords: list[str], location: str, max_resu
         _tasks[task_id].update(status="error", progress=str(exc), error=str(exc))
 
 
-@router.post("/scrapers/linkedin-rss")
-def start_linkedin_rss(req: LinkedInRSSRequest) -> dict:
+@router.post("/scrapers/linkedin")
+def start_linkedin(req: LinkedInRequest) -> dict:
     _require_api_key()
     task_id = str(uuid.uuid4())
     _tasks[task_id] = {"status": "pending", "progress": "Queued", "cancel_event": threading.Event()}
-    threading.Thread(target=_run_linkedin_rss, args=(task_id, req.keywords, req.location, req.max_results), daemon=True).start()
+    threading.Thread(target=_run_linkedin, args=(task_id, req.keywords, req.location, req.max_results), daemon=True).start()
     return {"task_id": task_id}
 
 

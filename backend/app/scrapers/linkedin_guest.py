@@ -83,7 +83,7 @@ async def _fetch_job_detail(
     return ScrapedJob(url=job_url, raw_jd=raw_jd, title=title, company=company, location=location)
 
 
-async def scrape_linkedin_rss(
+async def scrape_linkedin_guest(
     keywords: list[str],
     location: str,
     max_results: int = 25,
@@ -124,7 +124,7 @@ async def scrape_linkedin_rss(
                     logger.warning("[LinkedIn] Guest search failed keyword=%r: %s", keyword, exc)
                     break
 
-    logger.info("[LinkedIn RSS] Found %d URLs via guest search", len(search_items))
+    logger.info("[LinkedIn] Found %d URLs via guest search", len(search_items))
 
     # Step 2: fetch full JD for each URL via guest jobPosting API
     results: list[ScrapedJob] = []
@@ -139,7 +139,7 @@ async def scrape_linkedin_rss(
                 results.append(job)
             await asyncio.sleep(random.uniform(1.5, 3.5))
 
-    logger.info("[LinkedIn RSS] Fetched %d full job descriptions", len(results))
+    logger.info("[LinkedIn] Fetched %d full job descriptions", len(results))
     return results
 
 

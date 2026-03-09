@@ -172,8 +172,8 @@ export default function Scrapers() {
     startSeekTask(r.data.task_id)
   }
 
-  const startLinkedInRss = async () => {
-    const r = await api.post('/api/scrapers/linkedin-rss', {
+  const startLinkedIn = async () => {
+    const r = await api.post('/api/scrapers/linkedin', {
       keywords: rssKeywords.split(',').map(s => s.trim()).filter(Boolean),
       location: rssLoc,
       max_results: rssMax
@@ -279,8 +279,8 @@ export default function Scrapers() {
             <input className={inputCls} type="number" value={rssMax} onChange={e => setRssMax(Number(e.target.value))} />
           </div>
         </div>
-        <button className={btnCls} onClick={startLinkedInRss} disabled={rssTask?.status === 'running'}>
-          {rssTask?.status === 'running' ? '⏳ 爬取中...' : '🚀 RSS 搜索'}
+        <button className={btnCls} onClick={startLinkedIn} disabled={rssTask?.status === 'running'}>
+          {rssTask?.status === 'running' ? '⏳ 爬取中...' : '🚀 LinkedIn 搜索'}
         </button>
         <TaskStatus task={rssTask} onCancel={cancelRss} />
       </div>
