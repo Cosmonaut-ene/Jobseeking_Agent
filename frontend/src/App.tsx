@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import Jobs from './pages/Jobs'
 import Profile from './pages/Profile'
 import Resume from './pages/Resume'
+import Scout from './pages/Scout'
 import Scrapers from './pages/Scrapers'
 import Settings from './pages/Settings'
 import Notifications from './pages/Notifications'
@@ -14,6 +15,7 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/scout" element={<Scout />} />
           <Route path="/scrapers" element={<Scrapers />} />
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/resume" element={<Resume />} />
