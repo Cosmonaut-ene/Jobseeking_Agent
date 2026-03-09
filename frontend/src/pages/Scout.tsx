@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api/client'
 import type { Job } from '../api/client'
+import EvaluationReport from '../components/EvaluationReport'
 
 function ScoreBar({ score }: { score: number }) {
   const pct = Math.round(score * 100)
@@ -99,35 +100,8 @@ export default function Scout() {
             <ScoreBar score={result.match_score} />
           </div>
 
-          {/* Gap analysis */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h3 className="text-sm font-semibold text-green-700 mb-2">✅ Strong Matches</h3>
-              <ul className="space-y-1">
-                {result.gap_analysis.strong_matches.map((m, i) => (
-                  <li key={i} className="text-sm text-gray-700 flex items-start gap-1">
-                    <span className="text-green-500 mt-0.5">•</span> {m}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-red-600 mb-2">⚠️ Gaps / Missing Skills</h3>
-              <ul className="space-y-1">
-                {result.gap_analysis.missing_skills.map((s, i) => (
-                  <li key={i} className="text-sm text-gray-700 flex items-start gap-1">
-                    <span className="text-red-400 mt-0.5">•</span> {s}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          {result.gap_analysis.notes && (
-            <div className="bg-blue-50 rounded p-3 text-sm text-blue-900">
-              <span className="font-medium">Note: </span>{result.gap_analysis.notes}
-            </div>
-          )}
+          {/* Full 5-section evaluation */}
+          <EvaluationReport gap={result.gap_analysis} />
 
           {/* Skills */}
           {result.skills_required.length > 0 && (

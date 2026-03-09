@@ -9,9 +9,34 @@ export const api = axios.create({
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface GapAnalysis {
+  ats_pct?: number
   strong_matches: string[]
   missing_skills: string[]
+  unmet_requirements?: string[]
   notes: string
+  skills_improvements?: {
+    technical?: string[]
+    certifications?: string[]
+    soft_skills?: string[]
+    tools?: string[]
+  }
+  resume_improvements?: {
+    bullet_strength?: string[]
+    achievements_feedback?: string
+    metrics_suggestions?: string[]
+    ats_keywords?: string[]
+  }
+  formatting_improvements?: {
+    tone_clarity?: string[]
+    action_verbs?: string[]
+    layout?: string[]
+  }
+  recommendations?: {
+    top_5?: string[]
+    quick_wins?: string[]
+    deeper_improvements?: string[]
+    estimated_improvement_pct?: number
+  }
 }
 
 export interface Job {

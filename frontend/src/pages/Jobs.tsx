@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import type { Job, ResumeVersion } from '../api/client'
 import JobCard from '../components/JobCard'
+import EvaluationReport from '../components/EvaluationReport'
 
 const STATUSES = ['all', 'new', 'reviewed', 'dismissed', 'applied', 'interview', 'rejected', 'offer']
 
@@ -217,6 +218,7 @@ export default function Jobs() {
   const [resume, setResume] = useState<ResumeVersion | null>(null)
   const [coverLetter, setCoverLetter] = useState<string | null>(null)
   const [showJD, setShowJD] = useState(false)
+  const [showEval, setShowEval] = useState(false)
   const [docxUrl, setDocxUrl] = useState<string | null>(null)
 
   useEffect(() => { fetchJobs() }, [])
@@ -237,6 +239,7 @@ export default function Jobs() {
     setCoverLetter(null)
     setDocxUrl(null)
     setShowJD(false)
+    setShowEval(false)
     try {
       const r = await api.get(`/api/jobs/${job.id}`)
       setSelected(r.data)
@@ -384,21 +387,34 @@ export default function Jobs() {
                 </div>
               </div>
 
-              {/* Gap analysis */}
+              {/* Gap analysis summary + expandable full evaluation */}
               {(selected.gap_analysis.strong_matches.length > 0 || selected.gap_analysis.missing_skills.length > 0) && (
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="font-medium text-green-700 mb-1 text-xs">✅ Matches</p>
-                    <ul className="space-y-0.5 text-gray-600 text-xs">
-                      {selected.gap_analysis.strong_matches.map((m, i) => <li key={i}>• {m}</li>)}
-                    </ul>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium text-green-700 mb-1 text-xs">✅ Matches</p>
+                      <ul className="space-y-0.5 text-gray-600 text-xs">
+                        {selected.gap_analysis.strong_matches.map((m, i) => <li key={i}>• {m}</li>)}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-medium text-red-600 mb-1 text-xs">⚠️ Gaps</p>
+                      <ul className="space-y-0.5 text-gray-600 text-xs">
+                        {selected.gap_analysis.missing_skills.map((s, i) => <li key={i}>• {s}</li>)}
+                      </ul>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-red-600 mb-1 text-xs">⚠️ Gaps</p>
-                    <ul className="space-y-0.5 text-gray-600 text-xs">
-                      {selected.gap_analysis.missing_skills.map((s, i) => <li key={i}>• {s}</li>)}
-                    </ul>
-                  </div>
+                  <button
+                    onClick={() => setShowEval((v) => !v)}
+                    className="text-xs text-indigo-600 hover:underline"
+                  >
+                    {showEval ? '▲ Hide' : '▼ View'} Full Evaluation
+                  </button>
+                  {showEval && (
+                    <div className="pt-1">
+                      <EvaluationReport gap={selected.gap_analysis} />
+                    </div>
+                  )}
                 </div>
               )}
 

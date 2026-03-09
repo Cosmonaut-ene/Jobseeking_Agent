@@ -1,8 +1,8 @@
 # 求职助手系统 — 产品规格说明书
 
-**版本**：2.1
+**版本**：2.2
 **状态**：已实现
-**最后更新**：2026年3月7日
+**最后更新**：2026年3月9日
 **作者**：Zhang
 
 ---
@@ -85,8 +85,13 @@
 | ID | 功能 | 优先级 | 状态 |
 |---|---|---|---|
 | F-10 | 解析原始职位描述 → 结构化字段（职位、公司、地点、薪资、技能） | P0 | ✅ 完成 |
-| F-11 | 对候选人与用户简历的匹配度打分（0.0–1.0） | P0 | ✅ 完成 |
-| F-12 | 差距分析：强匹配项、缺失技能、备注 | P0 | ✅ 完成 |
+| F-11 | ATS 关键词匹配百分比评分（integer 0–100，存为 match_score = ats_pct / 100） | P0 | ✅ 完成 |
+| F-12 | 5节结构化评估报告：匹配分析、技能提升、简历内容、格式流畅度、优先建议 | P0 | ✅ 完成 |
+| F-12a | 匹配分析：ATS%进度条、强匹配项、缺失技能、未满足硬性要求、总结 | P0 | ✅ 完成 |
+| F-12b | 技能与资质改进：技术技能、证书、软技能、工具平台（各含说明） | P1 | ✅ 完成 |
+| F-12c | 简历内容改进：要点增强建议、成就评价、量化数据建议、缺失ATS关键词 | P1 | ✅ 完成 |
+| F-12d | 格式与语言改进：语气清晰度、动词替换建议、排版建议 | P1 | ✅ 完成 |
+| F-12e | 综合建议：Top 5优先行动、快速改进（1小时内）、深度改进（1–4周）、预估分数提升% | P1 | ✅ 完成 |
 | F-13 | 自动过滤：丢弃 <70%，保存 70–100% | P0 | ✅ 完成 |
 | F-14 | 可配置评分阈值（HIGH_SCORE、MID_SCORE） | P1 | ✅ 完成 |
 | F-15 | 匹配度 ≥80% 时立即推送通知 | P0 | ✅ 完成 |
@@ -375,13 +380,47 @@ class Job(SQLModel, table=True):
     location: str               # 职位地点
     salary_range: str           # 薪资范围（原始字符串，可能为空）
     skills_required: list[str]  # 职位描述中所需技能的 JSON 列表
-    match_score: float          # 0.0–1.0（AI 评分）
-    gap_analysis: dict          # { strong_matches, missing_skills, notes }
+    match_score: float          # 0.0–1.0（= ats_pct / 100，来自 EVAL_SCHEMA）
+    gap_analysis: dict          # 完整5节评估报告（见下方 Schema）
     source_url: str             # 原始职位发布 URL
     status: JobStatus           # 枚举（见下方）
     notification_sent: bool     # 是否已发送推送通知
     created_at: datetime
     updated_at: datetime
+```
+
+**gap_analysis Schema**（v2.2 扩展，向后兼容旧记录）：
+```json
+{
+  "ats_pct": 75,
+  "strong_matches": ["3年Python经验", "React+TypeScript项目"],
+  "missing_skills": ["AWS认证", "5年以上Java经验"],
+  "unmet_requirements": ["要求CS学位"],
+  "notes": "总体适配良好，需补充云平台经验。",
+  "skills_improvements": {
+    "technical": ["学习 AWS SageMaker，因该职位强调云端ML部署"],
+    "certifications": ["AWS Certified ML Specialty"],
+    "soft_skills": ["展示跨团队协作经验"],
+    "tools": ["dbt", "Airflow", "Terraform"]
+  },
+  "resume_improvements": {
+    "bullet_strength": ["为ML流水线要点添加量化结果"],
+    "achievements_feedback": "简历侧重职责描述，建议增加更多成果导向表述。",
+    "metrics_suggestions": ["量化API服务的用户规模"],
+    "ats_keywords": ["MLOps", "Feature Store", "Model Registry"]
+  },
+  "formatting_improvements": {
+    "tone_clarity": ["部分句子过长，建议拆分"],
+    "action_verbs": ["将 'helped with' 替换为 'Led'"],
+    "layout": ["技能部分建议置于经历之前"]
+  },
+  "recommendations": {
+    "top_5": ["在技能区加入'Agile'关键词", "..."],
+    "quick_wins": ["添加缺失ATS关键词到技能列表（30分钟内）"],
+    "deeper_improvements": ["完成AWS ML证书（约4周）"],
+    "estimated_improvement_pct": 15
+  }
+}
 ```
 
 **JobStatus 枚举**：
@@ -670,7 +709,7 @@ AI 顾问报告——技能差距分析。
 
 | 指标 | 目标 | 备注 |
 |---|---|---|
-| AI Agent 响应（Scout） | < 10秒/职位 | Gemini 2.5 Flash 延迟 |
+| AI Agent 响应（Scout 评估） | < 20秒/职位 | 5节结构化输出，输出量大于原评分 |
 | AI Agent 响应（定制） | < 15秒 | 处理较长上下文 |
 | 抓取吞吐量 | 约2-3个职位/分钟 | 含反爬延迟 |
 | 每日全量 Scout（50个职位） | < 10分钟 | 后台运行可接受 |
@@ -707,7 +746,7 @@ AI 顾问报告——技能差距分析。
 
 ### 8.5 可测试性
 
-- 后端测试套件：`backend/tests/` — **106 个测试全部通过**
+- 后端测试套件：`backend/tests/` — **119 个测试全部通过**（scout_agent 测试已随 `_evaluate` 重构同步更新）
 - 测试命令：`PYTHONPATH=. python3 -m pytest backend/tests/ -v`
 - 覆盖范围：Agent、抓取器、路由、数据模型
 - 前端：v2.0 无自动化测试（手动测试）
@@ -727,19 +766,28 @@ AI 顾问报告——技能差距分析。
 - React 仪表板（共8个页面）
 - 106 个通过测试
 
-### v2.1 — 当前版本 ✅
+### v2.1 ✅
 
 | 功能 | 优先级 | 状态 | 备注 |
 |---|---|---|---|
 | 简历 PDF 导出 | P1 | ✅ 完成 | WeasyPrint + Jinja2，`templates/resume.html` |
 | 前端 PDF 下载按钮 | P1 | ✅ 完成 | Jobs 页面"Download PDF"按钮 |
 | LinkedIn RSS 无登录抓取 | P2 | ✅ 完成 | `scrapers/linkedin_rss.py` + `/api/scrapers/linkedin-rss` |
+
+### v2.2 — 当前版本 ✅
+
+| 功能 | 优先级 | 状态 | 备注 |
+|---|---|---|---|
+| Scout Agent 5节结构化评估报告 | P1 | ✅ 完成 | `EVAL_SYSTEM` + `EVAL_SCHEMA`，替代原 `SCORE_SYSTEM` |
+| ATS匹配百分比评分（`ats_pct`） | P1 | ✅ 完成 | 取代原 `match_score` 直接输出，`match_score = ats_pct / 100` |
+| `EvaluationReport` 共享组件 | P1 | ✅ 完成 | `frontend/src/components/EvaluationReport.tsx` |
+| Scout 页面 5节折叠评估展示 | P1 | ✅ 完成 | 替代原2列强匹配/缺失技能 |
+| Jobs 页面"查看完整评估"展开区 | P1 | ✅ 完成 | 保留摘要 + 可展开全评估 |
 | 移动端响应式 UI | P1 | 🔲 待开发 | 可折叠侧边栏，触控友好 |
 | 职位备注/标签 | P2 | 🔲 待开发 | 用户自定义标签 |
 | 多简历档案 | P2 | 🔲 待开发 | 针对不同职位类型使用不同档案 |
 | Seek 自动申请 | P2 | 🔲 待开发 | 通过 Playwright 自动化一键 Easy Apply |
 | Indeed 自动申请 | P2 | 🔲 待开发 | 表单填写自动化 |
-| 更好的评分说明 | P1 | 🔲 待开发 | Scout Agent 提供更详细的推理 |
 
 ### v2.2 — 中期规划
 
@@ -1081,15 +1129,41 @@ templates/
 }
 ```
 
-### Scout Agent — 评分 Schema
+### Scout Agent — 综合评估 Schema（EVAL_SCHEMA，v2.2）
 ```json
 {
-  "match_score": "number (0.0-1.0)",
+  "ats_pct": "integer (0–100)",
   "strong_matches": ["string"],
   "missing_skills": ["string"],
-  "notes": "string"
+  "unmet_requirements": ["string"],
+  "notes": "string",
+  "skills_improvements": {
+    "technical": ["string"],
+    "certifications": ["string"],
+    "soft_skills": ["string"],
+    "tools": ["string"]
+  },
+  "resume_improvements": {
+    "bullet_strength": ["string"],
+    "achievements_feedback": "string",
+    "metrics_suggestions": ["string"],
+    "ats_keywords": ["string"]
+  },
+  "formatting_improvements": {
+    "tone_clarity": ["string"],
+    "action_verbs": ["string"],
+    "layout": ["string"]
+  },
+  "recommendations": {
+    "top_5": ["string"],
+    "quick_wins": ["string"],
+    "deeper_improvements": ["string"],
+    "estimated_improvement_pct": "integer"
+  }
 }
 ```
+
+> **注**：v2.1 及以前使用的 `{ "match_score": number, "strong_matches": [...], "missing_skills": [...], "notes": string }` 旧 schema 已废弃。`match_score` 现由后端计算：`match_score = ats_pct / 100`。旧数据库记录通过前端可选链（optional chaining）优雅降级渲染。
 
 ### Tailor Agent — 输出 Schema
 ```json
@@ -1109,10 +1183,13 @@ templates/
 
 | 术语 | 定义 |
 |---|---|
-| Scout Agent | AI 模块，用于解析职位描述并评估候选人匹配度 |
+| Scout Agent | AI 模块，用于解析职位描述并生成5节结构化评估报告 |
 | Tailor Agent | AI 模块，用于为特定职位重写简历要点 |
-| 差距分析 | Scout 输出：strong_matches、missing_skills、notes |
-| ATS 评分 | 求职者追踪系统评分：定制简历中涵盖所需技能的百分比 |
+| 差距分析（gap_analysis） | Scout 输出：含 ats_pct、strong_matches、missing_skills、unmet_requirements、5节改进建议及综合推荐 |
+| ATS 匹配百分比（ats_pct） | Scout EVAL_SCHEMA 输出：简历与职位描述的关键词匹配度，integer 0–100；存储为 match_score = ats_pct / 100 |
+| ATS 评分（ats_score） | Tailor Agent 输出：定制简历涵盖所需技能的百分比，存于 ResumeVersion.ats_score |
+| EvaluationReport | 前端共享组件（`components/EvaluationReport.tsx`），渲染5节折叠式评估报告，Scout 和 Jobs 页面均复用 |
+| 预估分数提升 | recommendations.estimated_improvement_pct：若执行 Top 5 建议后的预估 ATS 分数增幅 |
 | 高分职位 | 匹配度 ≥ HIGH_SCORE_THRESHOLD（默认 80%） |
 | 中分职位 | 匹配度介于 MID 和 HIGH 阈值之间（默认 70–80%） |
 | 每日 Scout | 完整流水线：抓取所有来源 → 评分所有职位 → 发送通知 |
@@ -1124,7 +1201,7 @@ templates/
 
 ---
 
-*本规格说明书描述了 Jobseeking Agent v2.0 的已实现状态。这是一份活文档——随着功能的新增或修改，请及时更新。*
+*本规格说明书描述了 Jobseeking Agent v2.2 的已实现状态。这是一份活文档——随着功能的新增或修改，请及时更新。*
 
 ---
 
@@ -1145,7 +1222,7 @@ templates/
 ```
 backend/app/
 ├── agents/parser.py           ✅ 已实现，禁止修改核心逻辑
-├── agents/scout.py            ✅ 已实现，禁止修改核心逻辑
+├── agents/scout.py            ✅ v2.2 已重构（EVAL_SYSTEM/EVAL_SCHEMA/_evaluate()），禁止修改
 ├── agents/tailor.py           ✅ 已实现，禁止修改核心逻辑
 ├── agents/cover_letter.py     ✅ 已实现，禁止修改核心逻辑
 ├── scrapers/seek.py           ✅ 已实现，禁止修改
@@ -1165,7 +1242,7 @@ backend/app/
 ├── config.py                  ✅ 已实现，允许新增变量，禁止修改现有变量
 └── database.py                ✅ 已实现，禁止修改
 
-frontend/src/                  ✅ 全部已实现，禁止修改现有页面逻辑
+frontend/src/                  ✅ v2.2 新增 components/EvaluationReport.tsx；Scout.tsx 和 Jobs.tsx 已更新渲染逻辑
 templates/resume.html          ✅ 已实现，禁止修改
 backend/tests/                 ✅ 含 test_pdf_generator.py 和 test_linkedin_rss.py，禁止删除或修改现有测试
 ```
