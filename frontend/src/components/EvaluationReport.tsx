@@ -90,61 +90,77 @@ export default function EvaluationReport({ gap }: { gap: GapAnalysis }) {
       </Section>
 
       {/* 2. Skills & Qualifications */}
-      {si && (
-        <Section title="2. Skills & Qualification Improvements">
-          <SubList label="Technical Skills to Learn" items={si.technical} color="blue" />
-          <SubList label="Certifications" items={si.certifications} color="blue" />
-          <SubList label="Soft Skills" items={si.soft_skills} />
-          <SubList label="Tools & Platforms" items={si.tools} />
-        </Section>
-      )}
+      <Section title="2. Skills & Qualification Improvements">
+        {si ? (
+          <>
+            <SubList label="Technical Skills to Learn" items={si.technical} color="blue" />
+            <SubList label="Certifications" items={si.certifications} color="blue" />
+            <SubList label="Soft Skills" items={si.soft_skills} />
+            <SubList label="Tools & Platforms" items={si.tools} />
+          </>
+        ) : (
+          <p className="text-xs text-gray-400 italic">Re-scout this job to see skill improvement suggestions.</p>
+        )}
+      </Section>
 
       {/* 3. Resume Content */}
-      {ri && (
-        <Section title="3. Resume Content Improvements">
-          <SubList label="Bullet Strength Tips" items={ri.bullet_strength} />
-          {ri.achievements_feedback && (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Achievements Feedback</p>
-              <p className="text-sm text-gray-700">{ri.achievements_feedback}</p>
-            </div>
-          )}
-          <SubList label="Add Metrics / Numbers" items={ri.metrics_suggestions} color="yellow" />
-          {ri.ats_keywords && ri.ats_keywords.length > 0 && (
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Missing ATS Keywords</p>
-              <div className="flex flex-wrap gap-1.5">
-                {ri.ats_keywords.map((kw, i) => (
-                  <span key={i} className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded text-xs font-mono">{kw}</span>
-                ))}
+      <Section title="3. Resume Content Improvements">
+        {ri ? (
+          <>
+            <SubList label="Bullet Strength Tips" items={ri.bullet_strength} />
+            {ri.achievements_feedback && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Achievements Feedback</p>
+                <p className="text-sm text-gray-700">{ri.achievements_feedback}</p>
               </div>
-            </div>
-          )}
-        </Section>
-      )}
+            )}
+            <SubList label="Add Metrics / Numbers" items={ri.metrics_suggestions} color="yellow" />
+            {ri.ats_keywords && ri.ats_keywords.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Missing ATS Keywords</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {ri.ats_keywords.map((kw, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded text-xs font-mono">{kw}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-gray-400 italic">Re-scout this job to see resume content suggestions.</p>
+        )}
+      </Section>
 
       {/* 4. Formatting */}
-      {fi && (
-        <Section title="4. Flow, Grammar & Formatting">
-          <SubList label="Tone & Clarity" items={fi.tone_clarity} />
-          <SubList label="Action Verb Upgrades" items={fi.action_verbs} color="yellow" />
-          <SubList label="Layout Suggestions" items={fi.layout} />
-        </Section>
-      )}
+      <Section title="4. Flow, Grammar & Formatting">
+        {fi ? (
+          <>
+            <SubList label="Tone & Clarity" items={fi.tone_clarity} />
+            <SubList label="Action Verb Upgrades" items={fi.action_verbs} color="yellow" />
+            <SubList label="Layout Suggestions" items={fi.layout} />
+          </>
+        ) : (
+          <p className="text-xs text-gray-400 italic">Re-scout this job to see formatting suggestions.</p>
+        )}
+      </Section>
 
       {/* 5. Recommendations */}
-      {rec && (
-        <Section title="5. Overall Recommendations">
-          {rec.estimated_improvement_pct !== undefined && (
-            <p className="text-sm font-medium text-green-700 bg-green-50 rounded px-3 py-2">
-              Estimated ATS score uplift if top recommendations implemented: +{rec.estimated_improvement_pct}%
-            </p>
-          )}
-          <SubList label="Top 5 Priority Actions" items={rec.top_5} color="blue" />
-          <SubList label="Quick Wins (under 1 hour)" items={rec.quick_wins} color="green" />
-          <SubList label="Deeper Improvements (1–4 weeks)" items={rec.deeper_improvements} color="yellow" />
-        </Section>
-      )}
+      <Section title="5. Overall Recommendations">
+        {rec ? (
+          <>
+            {rec.estimated_improvement_pct !== undefined && (
+              <p className="text-sm font-medium text-green-700 bg-green-50 rounded px-3 py-2">
+                Estimated ATS score uplift if top recommendations implemented: +{rec.estimated_improvement_pct}%
+              </p>
+            )}
+            <SubList label="Top 5 Priority Actions" items={rec.top_5} color="blue" />
+            <SubList label="Quick Wins (under 1 hour)" items={rec.quick_wins} color="green" />
+            <SubList label="Deeper Improvements (1–4 weeks)" items={rec.deeper_improvements} color="yellow" />
+          </>
+        ) : (
+          <p className="text-xs text-gray-400 italic">Re-scout this job to see prioritised recommendations.</p>
+        )}
+      </Section>
     </div>
   )
 }

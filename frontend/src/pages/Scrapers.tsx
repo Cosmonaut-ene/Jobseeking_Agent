@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api/client'
+import type { Job } from '../api/client'
+import EvaluationReport from '../components/EvaluationReport'
 
 interface TaskState {
   status: string
@@ -125,6 +127,29 @@ function TaskStatus({ task, onCancel }: { task: TaskState | null; onCancel: () =
 }
 
 export default function Scrapers() {
+  // Manual paste scout
+  const [jd, setJd] = useState('')
+  const [jdSource, setJdSource] = useState('manual')
+  const [jdLoading, setJdLoading] = useState(false)
+  const [jdError, setJdError] = useState('')
+  const [jdResult, setJdResult] = useState<Job | null>(null)
+
+  async function analyzeJd() {
+    if (!jd.trim()) return
+    setJdLoading(true)
+    setJdError('')
+    setJdResult(null)
+    try {
+      const r = await api.post('/api/jobs/scout', { raw_jd: jd, source: jdSource, auto_filter: false })
+      setJdResult(r.data)
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? '分析失败'
+      setJdError(msg)
+    } finally {
+      setJdLoading(false)
+    }
+  }
+
   // Seek
   const [seekRoles, setSeekRoles] = useState('Data Scientist, ML Engineer')
   const [seekLoc, setSeekLoc] = useState('Sydney NSW')
@@ -176,6 +201,54 @@ export default function Scrapers() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">爬虫控制台</h1>
+
+      {/* Manual paste */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold mb-1">手动粘贴职位描述</h2>
+        <p className="text-sm text-gray-500 mb-4">粘贴任意来源的职位描述，立即获取 AI 评估报告。</p>
+        <textarea
+          value={jd}
+          onChange={e => setJd(e.target.value)}
+          rows={8}
+          placeholder="在此粘贴完整职位描述…"
+          className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-3"
+        />
+        <div className="flex items-center gap-3">
+          <select
+            value={jdSource}
+            onChange={e => setJdSource(e.target.value)}
+            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            <option value="manual">Manual</option>
+            <option value="seek">Seek</option>
+            <option value="linkedin">LinkedIn</option>
+            <option value="indeed">Indeed</option>
+          </select>
+          <button
+            onClick={analyzeJd}
+            disabled={jdLoading || !jd.trim()}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {jdLoading ? '⏳ 分析中…' : '🔍 分析'}
+          </button>
+        </div>
+        {jdError && <p className="mt-3 text-sm text-red-600">{jdError}</p>}
+        {jdResult && (
+          <div className="mt-5 space-y-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-semibold text-gray-900">{jdResult.title}</p>
+                <p className="text-sm text-gray-500">{jdResult.company}{jdResult.location ? ` · ${jdResult.location}` : ''}</p>
+              </div>
+              <span className={`text-sm font-bold ${jdResult.match_score >= 0.7 ? 'text-green-700' : jdResult.match_score >= 0.4 ? 'text-yellow-700' : 'text-red-600'}`}>
+                {Math.round(jdResult.match_score * 100)}%
+              </span>
+            </div>
+            <EvaluationReport gap={jdResult.gap_analysis} />
+            <p className="text-xs text-gray-400">已保存到 Jobs：<span className="font-mono">{jdResult.id.slice(0, 8)}</span></p>
+          </div>
+        )}
+      </div>
 
       {/* Seek */}
       <div className="bg-white rounded-lg shadow p-6">
