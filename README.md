@@ -1,70 +1,82 @@
 # Jobseeking Agent
 
-An AI-powered personal job search automation platform. It scrapes job boards daily, scores each listing against your resume, generates tailored application materials, and pushes instant notifications — with minimal daily effort required.
+An AI-powered personal job search automation platform. It scrapes job boards daily, scores each listing against your resume with a detailed 5-section evaluation report, generates tailored application materials, and pushes instant notifications — requiring minimal daily effort.
 
-> **Stack**: FastAPI · SQLite · React · TypeScript · Tailwind · Gemini 2.5 Flash
+> **Stack**: FastAPI · SQLite · React 18 · TypeScript · Tailwind CSS · Gemini 2.5 Flash
 
 ---
 
 ## Features
 
 ### Job Discovery
-- **Automated daily scraping** — Seek.com.au and Indeed.com.au via Playwright (configurable schedule)
-- **LinkedIn support** — batch URL parsing (paste URLs, system scrapes details) + public RSS feed (no login required)
-- **Manual entry** — paste any job description into the Scout page for instant analysis
-- **Deduplication** — URL-based, skips already-seen jobs automatically
+- **Seek.com.au** — Playwright-based scraper with keyword + location + date filters
+- **Indeed.com.au** — Playwright-based scraper with keyword + location + date filters
+- **LinkedIn** — No-login guest API scraper (zero account risk, no cookies required)
+- **Manual entry** — Paste any job description into the Scout page for instant analysis
+- **URL deduplication** — Already-seen jobs are skipped automatically
+- **Scheduled daily scrape** — Runs all three sources at a configurable time (default 9:00 AM)
 
 ### AI Matching & Evaluation (Scout Agent)
-- Parses raw job description → structured fields (title, company, location, salary, required skills)
-- **5-section comprehensive evaluation report** per job:
-  1. **Match Analysis** — ATS keyword match % + strong matches + missing skills + unmet requirements
-  2. **Skills & Qualification Improvements** — technical skills, certifications, soft skills, tools (with explanations)
-  3. **Resume Content Improvements** — bullet strength tips, achievements feedback, metrics suggestions, missing ATS keywords
-  4. **Flow, Grammar & Formatting** — tone observations, action verb upgrades, layout suggestions
-  5. **Overall Recommendations** — top 5 priority actions, quick wins (< 1 hour), deeper improvements, estimated score uplift %
-- **Auto-filter** — discards jobs below `MID_SCORE_THRESHOLD` (default 70%), saves the rest
-- **Instant push notification** for jobs above `HIGH_SCORE_THRESHOLD` (default 80%)
+Every job is evaluated against your profile by Gemini 2.5 Flash and produces a **5-section structured report**:
+
+1. **Match Analysis** — ATS keyword match % · strong matches · missing skills · unmet hard requirements · summary
+2. **Skills & Qualifications** — Technical skills to learn (with reasons) · certifications · soft skills · tools/platforms
+3. **Resume Content** — Bullet strength tips · achievements vs duties feedback · metrics to add · exact ATS keywords missing from your resume
+4. **Flow & Formatting** — Tone/clarity observations · weak-verb-to-strong-verb replacements · layout suggestions
+5. **Recommendations** — Top 5 priority actions · quick wins (under 1 hour) · deeper improvements (1–4 weeks) · estimated ATS score uplift %
+
+Jobs below `MID_SCORE_THRESHOLD` (default 70%) are automatically discarded. Jobs above `HIGH_SCORE_THRESHOLD` (default 80%) trigger an instant push notification.
 
 ### Resume Tailoring
-- Upload PDF/DOCX resume or paste text → AI extracts structured profile
-- 6-tab profile editor (basics, skills, education, experience, projects, preferences)
-- One-click LLM tailoring per job — keyword-optimised without fabrication
+- Upload resume — PDF, DOCX, DOC, TXT, or MD → AI extracts a structured profile
+- Paste resume text → same extraction pipeline
+- **Incremental merge** — re-uploading a newer resume merges into the existing profile without overwriting manual edits
+- **6-tab profile editor** — Basic info · Skills (name / level / years) · Education · Experience · Projects · Preferences
+- **One-click tailoring per job** — rewrites bullets and summary for ATS keyword alignment; never fabricates facts
+- Every rewritten bullet includes its original source text for human review
 - ATS coverage score per tailored version
-- Source traceability — every rewritten bullet linked to its original text
-- **Download as Word (.docx)** for direct submission
+- **Download as Word (.docx)** and as **PDF** for direct submission
 
 ### Cover Letter Generation
-- Auto-generated from tailored resume + job description
-- 3-paragraph format, under 250 words, with email subject line
-- Application record created automatically on generation
+- Auto-generated from your tailored resume + job description
+- 3 short paragraphs, under 250 words, with an email subject line
+- Saves to `data/cover_letters/` as a `.txt` file
+- Automatically records an application entry and sets a follow-up reminder 7 days out
 
 ### Application Tracking
-- Job status lifecycle: `new → reviewed → applied → interview → offer / rejected / dismissed`
-- Per-application notes, channel (email / easy apply / manual), follow-up dates
-- Dashboard follow-up table flags overdue applications
+- Status lifecycle: `new → reviewed → applied → interview → offer / rejected / dismissed`
+- Per-application notes, channel, and follow-up date
+- Dashboard surfaces overdue follow-ups
 
 ### Dashboard & Analytics
-- Stats by status, source, score tier (high / mid)
+- Job counts by status, source, and score tier
 - Jobs added in the last 7 days
-- **AI Advisor report** — top missing skills across all saved jobs, market summary, recommended actions
+- **AI Advisor report** — generated on demand; analyses all saved jobs to surface top missing skills, market summary, and recommended actions
 
 ### Notifications
-- Webhook push compatible with Telegram Bot API
-- Immediate push on high-score job discovery
-- Daily summary: scrape stats + top new jobs
+- Sends via any **HTTP webhook** (payload format is Telegram Bot API compatible)
+- **Immediate push** when a job scores ≥ 80% — sent within seconds of discovery
+- **Daily summary** after the scheduled scout — scrape stats and top new jobs by score
+- Manual test button in the UI to verify your webhook
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Backend | FastAPI 0.134, Uvicorn, SQLModel, SQLite |
-| AI | Google Gemini 2.5 Flash (structured JSON output) |
-| Scraping | Playwright (Seek, Indeed, LinkedIn URLs), httpx (LinkedIn RSS) |
-| Scheduling | APScheduler |
-| PDF/DOCX | pypdf, python-docx, WeasyPrint, Jinja2 |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Axios |
+| Layer | Technology | Version |
+|---|---|---|
+| Backend framework | FastAPI + Uvicorn | 0.134 / 0.41 |
+| ORM / database | SQLModel + SQLite | 0.0.22 |
+| AI | Google Gemini 2.5 Flash | google-genai ≥ 1.0 |
+| Web scraping | Playwright (Chromium) | 1.40 |
+| LinkedIn scraping | httpx + BeautifulSoup4 | guest API, no login |
+| Scheduling | APScheduler | 3.10 |
+| Resume parsing | pypdf + python-docx | 4.0 / 1.1 |
+| PDF generation | WeasyPrint + Jinja2 | — |
+| Frontend | React 18 + TypeScript | 18.3 / 5.4 |
+| Build tool | Vite | 5.3 |
+| Styling | Tailwind CSS | 3.4 |
+| HTTP client (frontend) | Axios | 1.7 |
 
 ---
 
@@ -78,7 +90,7 @@ An AI-powered personal job search automation platform. It scrapes job boards dai
 
 ## Setup
 
-### 1. Clone & install
+### 1. Clone and install
 
 ```bash
 git clone https://github.com/Cosmonaut-ene/Jobseeking_Agent.git
@@ -94,66 +106,65 @@ cd frontend && npm install && cd ..
 
 ### 2. Configure environment
 
-```bash
-cp .env.example .env   # or create manually
-```
-
-Edit `.env`:
+Create a `.env` file in the project root:
 
 ```env
+# Required
 GEMINI_API_KEY=your_key_here
 
-# Optional — Telegram-compatible webhook for push notifications
+# Optional — push notifications (Telegram Bot API compatible webhook)
 NOTIFICATION_WEBHOOK_URL=https://api.telegram.org/bot<token>/sendMessage
 NOTIFICATION_CHAT_ID=your_chat_id
 
-# Optional — override defaults
+# Optional — thresholds (defaults shown)
 HIGH_SCORE_THRESHOLD=0.80
 MID_SCORE_THRESHOLD=0.70
+
+# Optional — scheduler
 SCHEDULER_ENABLED=true
 SCHEDULER_HOUR=9
 SCHEDULER_MINUTE=0
 DEFAULT_MAX_JOBS=15
 ```
 
-### 3. Run
+### 3. Start
 
 ```bash
 # Terminal 1 — backend
 uvicorn backend.app.main:app --reload
-# → http://localhost:8000  (API docs: /docs)
+# API: http://localhost:8000   Docs: http://localhost:8000/docs
 
 # Terminal 2 — frontend
 cd frontend && npm run dev
-# → http://localhost:5173
+# UI: http://localhost:5173
 ```
 
 ### 4. First-time setup
 
-1. Open **Settings** → enter your Gemini API key
-2. Open **Profile** → upload your resume PDF/DOCX or paste resume text
-3. Review the extracted profile across all 6 tabs and save
+1. **Settings** → enter your Gemini API key (and optionally webhook URL)
+2. **Resume** → upload your resume PDF/DOCX or paste resume text; review the extracted profile
+3. **Profile** → fine-tune extracted data across all 6 tabs and save
 
 ---
 
 ## Usage
 
-### Analyse a single job
-Go to **Scout**, paste any job description, click **Analyse**. The AI returns a full 5-section evaluation report with an ATS match percentage and prioritised improvement actions.
+### Analyse a single job (Scout)
+Paste any job description → **Analyse**. The 5-section evaluation report appears with ATS match %, prioritised actions, and missing keywords.
 
-### Scrape job boards
-Go to **Scrapers**, enter keywords and location, click **Run** for Seek or Indeed. Jobs above the mid-score threshold are saved automatically; high-score jobs trigger an instant notification.
+### Scrape job boards (Scrapers)
+Enter keywords, location, and max results for Seek, Indeed, or LinkedIn. Results matching your thresholds are saved automatically; high-score jobs trigger an instant notification.
 
-### Review & apply
-Go to **Jobs** — filtered list of saved jobs sorted by score. Select a job to:
-- View the full evaluation report ("View Full Evaluation")
-- Approve / Dismiss
-- **Tailor Resume** — generates a keyword-optimised version with ATS score
-- **Download Word** — `.docx` ready for submission
-- **Cover Letter** — generates email subject + 3-paragraph body
+### Review and apply (Jobs)
+- Select a job from the list to open the detail panel
+- **Approve / Dismiss** to manage your pipeline
+- **Tailor Resume** → generates an ATS-optimised version with a score and source-tracked bullets
+- **Download Word / PDF** for submission
+- **Cover Letter** → generates email subject + 3-paragraph body; records the application with a 7-day follow-up reminder
+- **View Full Evaluation** → expands the complete 5-section report inline
 
-### Track applications
-Update job status as you progress. The Dashboard shows pipeline stats and flags follow-ups that are due.
+### Track progress (Dashboard)
+Monitor pipeline stats, check the AI Advisor report for skill gap insights, and review the follow-up table for overdue applications.
 
 ---
 
@@ -162,68 +173,62 @@ Update job status as you progress. The Dashboard shows pipeline stats and flags 
 | Variable | Default | Description |
 |---|---|---|
 | `GEMINI_API_KEY` | — | **Required.** Google Gemini API key |
-| `NOTIFICATION_WEBHOOK_URL` | — | Telegram Bot API webhook URL |
-| `NOTIFICATION_CHAT_ID` | — | Telegram chat / channel ID |
-| `HIGH_SCORE_THRESHOLD` | `0.80` | ATS % threshold for instant push notification |
-| `MID_SCORE_THRESHOLD` | `0.70` | Minimum ATS % to save a job |
+| `NOTIFICATION_WEBHOOK_URL` | — | HTTP webhook for push notifications |
+| `NOTIFICATION_CHAT_ID` | — | Optional `chat_id` field added to webhook payload |
+| `HIGH_SCORE_THRESHOLD` | `0.80` | ATS score threshold for instant notification |
+| `MID_SCORE_THRESHOLD` | `0.70` | Minimum score to save a job (below this is discarded) |
 | `SCHEDULER_ENABLED` | `true` | Enable daily auto-scrape |
-| `SCHEDULER_HOUR` | `9` | Hour to run daily scrape (local time) |
-| `SCHEDULER_MINUTE` | `0` | Minute to run daily scrape |
-| `DEFAULT_MAX_JOBS` | `15` | Max results per scraper run |
+| `SCHEDULER_HOUR` | `9` | Hour to run the daily scrape (24-hour, local time) |
+| `SCHEDULER_MINUTE` | `0` | Minute to run the daily scrape |
+| `DEFAULT_MAX_JOBS` | `15` | Default max results per scraper run |
 
 ---
 
 ## Docker
 
 ```bash
-cp .env.example .env   # fill in GEMINI_API_KEY
+cp .env.example .env   # set GEMINI_API_KEY
 docker compose up -d
-# → http://localhost:8000
+# http://localhost:8000
 ```
 
-The `data/` directory is mounted as a volume — your database, profile, and generated files persist across restarts.
+`data/` is mounted as a volume — your database, profile JSON, and generated files persist across restarts.
 
 ---
 
-## Deployment (Render)
+## Deploy to Render
 
-A `render.yaml` is included for one-click deployment to [Render](https://render.com):
+A `render.yaml` is included for one-click deployment:
 
 1. Fork this repo
-2. Create a new **Blueprint** in Render and connect your fork
-3. Set `GEMINI_API_KEY` (and optionally notification vars) as environment secrets
-4. Deploy — the build step installs dependencies, builds the frontend, and starts Uvicorn
+2. Create a new **Blueprint** in [Render](https://render.com) and connect your fork
+3. Set `GEMINI_API_KEY` (and optionally `NOTIFICATION_WEBHOOK_URL` / `NOTIFICATION_CHAT_ID`) as environment secrets
+4. Deploy — Render builds the frontend, installs Chromium, and starts Uvicorn
 
-A 1 GB persistent disk is attached at `data/` to preserve the database between deploys.
+A 1 GB persistent disk is attached at `data/` to keep your database between deploys.
 
 ---
 
 ## Development
 
 ```bash
-# Run tests
+# Run backend tests
 PYTHONPATH=. python3 -m pytest backend/tests/ -v
 
-# TypeScript check
+# TypeScript type check
 cd frontend && npx tsc --noEmit
 ```
 
-- Branch naming: `feat/`, `fix/`, `chore/`, `refactor/` + short description
-- PRs target `main`; never commit directly to `main`
+Branch naming: `feat/`, `fix/`, `chore/`, `refactor/` + short hyphenated description. PRs target `main`; never commit directly to `main`.
 
 ---
 
 ## Data & Privacy
 
-All data stays local (SQLite file at `data/db/jobseeking.db`). The only external calls are:
-- Gemini API (job description text + resume profile sent for AI processing)
-- Job board websites (scraping)
-- Your configured notification webhook (job title, company, score)
+All data is stored locally in `data/db/jobseeking.db` (SQLite) and `data/user_profile.json`. The only external calls made are:
 
-No analytics, no third-party tracking.
+- **Gemini API** — job description text and your resume profile are sent for AI processing
+- **Job board websites** — Seek, Indeed, LinkedIn (public pages only, no accounts)
+- **Your configured webhook** — job title, company, and match score on high-score discoveries
 
----
-
-## License
-
-Personal use. Not licensed for redistribution.
+No analytics, no telemetry, no third-party tracking.
