@@ -2,22 +2,24 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import type { AdvisorReport, DashboardStats } from '../api/client'
-
-const STAT_CARDS = [
-  { key: 'new', label: 'New', color: 'bg-blue-500' },
-  { key: 'reviewed', label: 'Reviewed', color: 'bg-purple-500' },
-  { key: 'applied', label: 'Applied', color: 'bg-yellow-500' },
-  { key: 'interview', label: 'Interview', color: 'bg-green-500' },
-  { key: 'offer', label: 'Offer', color: 'bg-emerald-500' },
-]
+import { useT } from '../contexts/LanguageContext'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const t = useT()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [followups, setFollowups] = useState<{ application: Record<string, unknown>; job: Record<string, string> | null; overdue_days: number }[]>([])
   const [report, setReport] = useState<AdvisorReport | null>(null)
   const [loadingReport, setLoadingReport] = useState(false)
   const [reportError, setReportError] = useState('')
+
+  const STAT_CARDS = [
+    { key: 'new', label: t('stat_new'), color: 'bg-blue-500' },
+    { key: 'reviewed', label: t('stat_reviewed'), color: 'bg-purple-500' },
+    { key: 'applied', label: t('stat_applied'), color: 'bg-yellow-500' },
+    { key: 'interview', label: t('stat_interview'), color: 'bg-green-500' },
+    { key: 'offer', label: t('stat_offer'), color: 'bg-emerald-500' },
+  ]
 
   useEffect(() => {
     api.get('/api/dashboard/stats').then((r) => setStats(r.data)).catch(() => {})
@@ -41,12 +43,12 @@ export default function Dashboard() {
   return (
     <div className="max-w-4xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('dashboard_title')}</h1>
         <button
           onClick={() => navigate('/notifications')}
           className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700"
         >
-          🚀 立即爬取
+          {t('dashboard_trigger_btn')}
         </button>
       </div>
 
@@ -65,14 +67,14 @@ export default function Dashboard() {
       {/* Summary row */}
       {stats && (
         <div className="flex flex-wrap gap-6 mb-8 text-sm text-gray-600">
-          <span>Total jobs: <strong className="text-gray-900">{stats.total_jobs}</strong></span>
-          <span>Dismissed: <strong className="text-gray-900">{stats.by_status?.dismissed ?? 0}</strong></span>
-          <span>Rejected: <strong className="text-gray-900">{stats.by_status?.rejected ?? 0}</strong></span>
+          <span>{t('total_jobs')} <strong className="text-gray-900">{stats.total_jobs}</strong></span>
+          <span>{t('dismissed')} <strong className="text-gray-900">{stats.by_status?.dismissed ?? 0}</strong></span>
+          <span>{t('rejected')} <strong className="text-gray-900">{stats.by_status?.rejected ?? 0}</strong></span>
           {stats.high_score_count !== undefined && (
-            <span>High score (≥80%): <strong className="text-green-700">{stats.high_score_count}</strong></span>
+            <span>{t('high_score_label')} <strong className="text-green-700">{stats.high_score_count}</strong></span>
           )}
           {stats.mid_score_count !== undefined && (
-            <span>Mid score (70-80%): <strong className="text-yellow-700">{stats.mid_score_count}</strong></span>
+            <span>{t('mid_score_label')} <strong className="text-yellow-700">{stats.mid_score_count}</strong></span>
           )}
         </div>
       )}
@@ -81,14 +83,14 @@ export default function Dashboard() {
       {followups.length > 0 && (
         <div className="bg-white rounded-lg shadow mb-8">
           <div className="px-5 py-3 border-b">
-            <h2 className="font-semibold text-gray-700">Follow-ups Due</h2>
+            <h2 className="font-semibold text-gray-700">{t('followups_title')}</h2>
           </div>
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="text-left px-5 py-2 text-gray-600 font-medium">Role</th>
-                <th className="text-left px-5 py-2 text-gray-600 font-medium">Company</th>
-                <th className="text-left px-5 py-2 text-gray-600 font-medium">Follow-up Date</th>
+                <th className="text-left px-5 py-2 text-gray-600 font-medium">{t('col_role')}</th>
+                <th className="text-left px-5 py-2 text-gray-600 font-medium">{t('col_company')}</th>
+                <th className="text-left px-5 py-2 text-gray-600 font-medium">{t('col_followup_date')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -109,13 +111,13 @@ export default function Dashboard() {
       {/* Advisor */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-700">AI Advisor Report</h2>
+          <h2 className="font-semibold text-gray-700">{t('advisor_title')}</h2>
           <button
             onClick={runAdvisor}
             disabled={loadingReport}
             className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
           >
-            {loadingReport ? 'Generating…' : '✨ Generate Report'}
+            {loadingReport ? t('advisor_generating') : t('advisor_generate_btn')}
           </button>
         </div>
 
@@ -124,22 +126,22 @@ export default function Dashboard() {
         {report && (
           <div className="space-y-4 text-sm">
             <section>
-              <h3 className="font-medium text-gray-800 mb-1">Market Summary</h3>
+              <h3 className="font-medium text-gray-800 mb-1">{t('advisor_market_summary')}</h3>
               <p className="text-gray-600">{report.market_summary}</p>
             </section>
             <section>
-              <h3 className="font-medium text-gray-800 mb-1">Skill Gap Analysis</h3>
+              <h3 className="font-medium text-gray-800 mb-1">{t('advisor_skill_gap')}</h3>
               <p className="text-gray-600">{report.skill_gap_analysis}</p>
             </section>
             <section>
-              <h3 className="font-medium text-gray-800 mb-2">Recommended Actions</h3>
+              <h3 className="font-medium text-gray-800 mb-2">{t('advisor_recommended')}</h3>
               <ol className="list-decimal list-inside space-y-1 text-gray-600">
                 {report.recommended_actions.map((a, i) => <li key={i}>{a}</li>)}
               </ol>
             </section>
             <section className="grid grid-cols-2 gap-4 pt-2 border-t">
               <div>
-                <h3 className="font-medium text-gray-800 mb-1">Top Missing Skills</h3>
+                <h3 className="font-medium text-gray-800 mb-1">{t('advisor_missing_skills')}</h3>
                 <div className="flex flex-wrap gap-1">
                   {report.top_missing_skills.slice(0, 8).map((s) => (
                     <span key={s.skill} className="px-2 py-0.5 bg-red-100 text-red-800 rounded text-xs">
@@ -149,7 +151,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div>
-                <h3 className="font-medium text-gray-800 mb-1">Your Skills in Demand</h3>
+                <h3 className="font-medium text-gray-800 mb-1">{t('advisor_present_skills')}</h3>
                 <div className="flex flex-wrap gap-1">
                   {report.top_present_skills.slice(0, 8).map((s) => (
                     <span key={s.skill} className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">
@@ -163,7 +165,7 @@ export default function Dashboard() {
         )}
 
         {!report && !loadingReport && (
-          <p className="text-gray-400 text-sm">Click "Generate Report" to analyse your job market data.</p>
+          <p className="text-gray-400 text-sm">{t('advisor_placeholder')}</p>
         )}
       </div>
     </div>
