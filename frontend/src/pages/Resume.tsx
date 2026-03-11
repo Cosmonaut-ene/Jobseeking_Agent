@@ -6,7 +6,12 @@ import type { Education, Experience, Project, Skill, UserProfile } from '../api/
 
 function mergeSkills(existing: Skill[], parsed: Skill[]): Skill[] {
   const map = new Map(existing.map((s) => [s.name.toLowerCase(), s]))
-  parsed.forEach((s) => map.set(s.name.toLowerCase(), s))
+  parsed.forEach((s) => {
+    const key = s.name.toLowerCase()
+    const prev = map.get(key)
+    // years only ever goes up — AI inference is unstable; manual edit required to reduce
+    map.set(key, prev ? { ...s, years: Math.max(prev.years, s.years) } : s)
+  })
   return Array.from(map.values())
 }
 
