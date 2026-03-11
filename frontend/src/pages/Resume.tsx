@@ -78,8 +78,27 @@ export default function Resume() {
       let existing: UserProfile | null = null
       try { existing = (await api.get('/api/profile')).data } catch { /* no existing profile */ }
 
+      const isReal = (v: string | null | undefined) => !!v && v !== 'N/A' && v.trim() !== ''
+
       const merged: UserProfile = {
-        ...parsed,
+        // existing profile as base — prevents N/A from overwriting real data
+        ...existing,
+        // scalar fields: only overwrite when parsed value is meaningful
+        name: isReal(parsed.name) ? parsed.name : (existing?.name ?? ''),
+        target_roles: parsed.target_roles?.length
+          ? parsed.target_roles
+          : (existing?.target_roles ?? []),
+        // preferences: field-level merge so partial pastes don't wipe existing prefs
+        preferences: {
+          ...existing?.preferences,
+          ...(parsed.preferences?.locations?.length
+            ? { locations: parsed.preferences.locations } : {}),
+          ...(parsed.preferences?.job_types?.length
+            ? { job_types: parsed.preferences.job_types } : {}),
+          ...(parsed.preferences?.salary_range
+            ? { salary_range: parsed.preferences.salary_range } : {}),
+        },
+        // array fields: incremental merge (existing items kept; parsed items upserted by key)
         skills:     mergeSkills(existing?.skills ?? [], parsed.skills ?? []),
         experience: mergeExperience(existing?.experience ?? [], parsed.experience ?? []),
         projects:   mergeProjects(existing?.projects ?? [], parsed.projects ?? []),
