@@ -56,6 +56,73 @@ function TagListEditor({
   )
 }
 
+// ── Duration picker ───────────────────────────────────────────────────────────
+const CUR_YEAR = new Date().getFullYear()
+const YEAR_OPTS = Array.from({ length: CUR_YEAR - 1989 }, (_, i) => String(CUR_YEAR - i))
+const MONTH_OPTS: [string, string][] = [
+  ['01','Jan'],['02','Feb'],['03','Mar'],['04','Apr'],
+  ['05','May'],['06','Jun'],['07','Jul'],['08','Aug'],
+  ['09','Sep'],['10','Oct'],['11','Nov'],['12','Dec'],
+]
+
+function parseDuration(s: string) {
+  const [startStr = '', endStr = ''] = s.split(' ~ ')
+  const [sy = '', sm = ''] = startStr.split('-')
+  const isPresent = !endStr || endStr.toLowerCase() === 'present'
+  const [ey = '', em = ''] = isPresent ? [] : endStr.split('-')
+  return { sy, sm, ey, em, isPresent }
+}
+
+function DurationPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { sy, sm, ey, em, isPresent } = parseDuration(value)
+
+  function emit(next: { sy: string; sm: string; ey: string; em: string; isPresent: boolean }) {
+    const start = next.sm ? `${next.sy}-${next.sm}` : next.sy
+    const end = next.isPresent ? 'Present' : (next.em ? `${next.ey}-${next.em}` : next.ey)
+    onChange(`${start} ~ ${end}`)
+  }
+
+  const sel = 'border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400'
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <select value={sy} onChange={(e) => emit({ sy: e.target.value, sm, ey, em, isPresent })} className={sel}>
+        <option value="">Year</option>
+        {YEAR_OPTS.map((y) => <option key={y}>{y}</option>)}
+      </select>
+      <select value={sm} onChange={(e) => emit({ sy, sm: e.target.value, ey, em, isPresent })} className={sel}>
+        <option value="">Month</option>
+        {MONTH_OPTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+      </select>
+      <span className="text-gray-400 text-sm">~</span>
+      {isPresent ? (
+        <>
+          <span className="text-gray-500 text-sm px-1">Present</span>
+          <button
+            onClick={() => emit({ sy, sm, ey: String(CUR_YEAR), em: '', isPresent: false })}
+            className="text-xs text-blue-500 hover:underline"
+          >set end</button>
+        </>
+      ) : (
+        <>
+          <select value={ey} onChange={(e) => emit({ sy, sm, ey: e.target.value, em, isPresent })} className={sel}>
+            <option value="">Year</option>
+            {YEAR_OPTS.map((y) => <option key={y}>{y}</option>)}
+          </select>
+          <select value={em} onChange={(e) => emit({ sy, sm, ey, em: e.target.value, isPresent })} className={sel}>
+            <option value="">Month</option>
+            {MONTH_OPTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+          </select>
+          <button
+            onClick={() => emit({ sy, sm, ey: '', em: '', isPresent: true })}
+            className="text-xs text-blue-500 hover:underline"
+          >Present</button>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Basic tab ────────────────────────────────────────────────────────────────
 function BasicTab({ profile, onChange }: { profile: UserProfile; onChange: (p: UserProfile) => void }) {
   return (
@@ -188,25 +255,22 @@ function ExperienceTab({ experience, onChange }: { experience: Experience[]; onC
       {experience.map((exp, i) => (
         <div key={i} className="border rounded-lg p-4 bg-gray-50 space-y-3">
           <div className="flex justify-between items-start">
-            <div className="grid grid-cols-3 gap-2 flex-1 mr-3">
-              <input
-                value={exp.role}
-                onChange={(e) => update(i, { role: e.target.value })}
-                placeholder="Role"
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <input
-                value={exp.company}
-                onChange={(e) => update(i, { company: e.target.value })}
-                placeholder="Company"
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <input
-                value={exp.duration}
-                onChange={(e) => update(i, { duration: e.target.value })}
-                placeholder="2022-01 ~ 2024-06"
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
+            <div className="flex flex-col gap-2 flex-1 mr-3">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={exp.role}
+                  onChange={(e) => update(i, { role: e.target.value })}
+                  placeholder="Role"
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <input
+                  value={exp.company}
+                  onChange={(e) => update(i, { company: e.target.value })}
+                  placeholder="Company"
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+              </div>
+              <DurationPicker value={exp.duration} onChange={(v) => update(i, { duration: v })} />
             </div>
             <button onClick={() => onChange(experience.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-sm">Remove</button>
           </div>
@@ -345,37 +409,34 @@ function EducationTab({ education, onChange }: { education: Education[]; onChang
       {education.map((edu, i) => (
         <div key={i} className="border rounded-lg p-4 bg-gray-50 space-y-2">
           <div className="flex justify-between items-start">
-            <div className="grid grid-cols-2 gap-2 flex-1 mr-3">
-              <input
-                value={edu.institution}
-                onChange={(e) => update(i, { institution: e.target.value })}
-                placeholder="Institution"
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <input
-                value={edu.degree}
-                onChange={(e) => update(i, { degree: e.target.value })}
-                placeholder="Degree (e.g. Bachelor)"
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <input
-                value={edu.field}
-                onChange={(e) => update(i, { field: e.target.value })}
-                placeholder="Field of study"
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <input
-                value={edu.duration}
-                onChange={(e) => update(i, { duration: e.target.value })}
-                placeholder="2018-03 ~ 2022-06"
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
-              <input
-                value={edu.gpa}
-                onChange={(e) => update(i, { gpa: e.target.value })}
-                placeholder="GPA (optional)"
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
+            <div className="flex flex-col gap-2 flex-1 mr-3">
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  value={edu.institution}
+                  onChange={(e) => update(i, { institution: e.target.value })}
+                  placeholder="Institution"
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <input
+                  value={edu.degree}
+                  onChange={(e) => update(i, { degree: e.target.value })}
+                  placeholder="Degree (e.g. Bachelor)"
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <input
+                  value={edu.field}
+                  onChange={(e) => update(i, { field: e.target.value })}
+                  placeholder="Field of study"
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+                <input
+                  value={edu.gpa}
+                  onChange={(e) => update(i, { gpa: e.target.value })}
+                  placeholder="GPA (optional)"
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+              </div>
+              <DurationPicker value={edu.duration} onChange={(v) => update(i, { duration: v })} />
             </div>
             <button onClick={() => onChange(education.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-sm">Remove</button>
           </div>
