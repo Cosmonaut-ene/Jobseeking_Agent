@@ -1,8 +1,8 @@
 # 求职助手系统 — 产品规格说明书
 
-**版本**：2.2
+**版本**：2.3
 **状态**：已实现
-**最后更新**：2026年3月10日
+**最后更新**：2026年3月11日
 **作者**：Zhang
 
 ---
@@ -107,6 +107,7 @@
 | F-22 | 档案增量合并（新增+现有，不覆盖） | P1 | ✅ 完成 |
 | F-23 | 6 标签页档案编辑器（基本、技能、教育、经历、项目、偏好） | P1 | ✅ 完成 |
 | F-24 | 按职位的 LLM 简历定制（关键词优化，不捏造） | P0 | ✅ 完成 |
+| F-24a | Tailor Agent 注入 ATS 关键词与量化建议（利用 gap_analysis.resume_improvements） | P1 | ✅ 完成 |
 | F-25 | 每个定制版本的 ATS 评分 | P1 | ✅ 完成 |
 | F-26 | 变更摘要（修改了什么） | P1 | ✅ 完成 |
 | F-27 | 来源可追溯性：每条定制要点关联原始文本 | P1 | ✅ 完成 |
@@ -792,7 +793,13 @@ AI 顾问报告——技能差距分析。
 | Seek 自动申请 | P2 | 🔲 待开发 | 通过 Playwright 自动化一键 Easy Apply |
 | Indeed 自动申请 | P2 | 🔲 待开发 | 表单填写自动化 |
 
-### v2.2 — 中期规划
+### v2.3 — 当前版本 ✅
+
+| 功能 | 优先级 | 状态 | 备注 |
+|---|---|---|---|
+| Tailor Agent ATS 关键词注入 | P1 | ✅ 完成 | 松绑 STRICT RULE 1：允许织入 JD 术语；新增 Rule 6；Prompt 增加 `## Target ATS Keywords` 和 `## Quantification Opportunities` 两节，数据来自 `gap_analysis.resume_improvements`（Scout 已产出，v2.3 前未使用） |
+
+### v2.3 — 中期规划
 
 | 功能 | 优先级 | 备注 |
 |---|---|---|
@@ -1440,7 +1447,8 @@ PYTHONPATH=. pytest backend/tests/ --co -q | tail -5
 
 | 文件/目录 | 说明 |
 |---|---|
-| `backend/app/agents/` | 🔴 只读，禁止修改 |
+| `backend/app/agents/tailor.py` | 🟡 v2.3 已修改（ATS 关键词注入），后续扩展允许追加，禁止修改已有规则 |
+| `backend/app/agents/` 其余文件 | 🔴 只读，禁止修改 |
 | `backend/app/models/` | 🔴 只读，禁止修改表结构 |
 | `backend/app/scrapers/seek.py` | 🔴 只读，禁止修改 |
 | `backend/app/scrapers/linkedin_guest.py` | 🔴 只读，禁止修改（Guest API 实现已稳定） |
