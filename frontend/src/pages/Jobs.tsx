@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import type { Job, ResumeVersion } from '../api/client'
 import JobCard from '../components/JobCard'
 import EvaluationReport from '../components/EvaluationReport'
+import { useT } from '../contexts/LanguageContext'
 
 const STATUSES = ['all', 'new', 'reviewed', 'dismissed', 'applied', 'interview', 'rejected', 'offer']
 
@@ -30,6 +31,7 @@ interface TailoredContent {
 
 // ── Copy button ───────────────────────────────────────────────────────────────
 function CopyBtn({ text }: { text: string }) {
+  const t = useT()
   const [copied, setCopied] = useState(false)
   function copy() {
     navigator.clipboard.writeText(text).then(() => {
@@ -42,13 +44,14 @@ function CopyBtn({ text }: { text: string }) {
       onClick={copy}
       className="ml-2 px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-700 transition-colors"
     >
-      {copied ? '✓' : 'Copy'}
+      {copied ? t('copy_btn_done') : t('copy_btn')}
     </button>
   )
 }
 
 // ── Full resume viewer ────────────────────────────────────────────────────────
 function ResumePanel({ resume }: { resume: ResumeVersion }) {
+  const t = useT()
   const content = resume.content_json as TailoredContent
   const atsPct = Math.round(resume.ats_score * 100)
 
@@ -56,9 +59,9 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
     <div className="border rounded-lg bg-white text-sm divide-y">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-t-lg">
-        <span className="font-semibold text-gray-700">✂️ Tailored Resume</span>
+        <span className="font-semibold text-gray-700">{t('resume_panel_title')}</span>
         <div className="flex items-center gap-3 text-xs text-gray-500">
-          <span>ATS coverage: <strong className={atsPct >= 70 ? 'text-green-700' : atsPct >= 40 ? 'text-yellow-700' : 'text-red-600'}>{atsPct}%</strong></span>
+          <span>{t('resume_ats_match')} <strong className={atsPct >= 70 ? 'text-green-700' : atsPct >= 40 ? 'text-yellow-700' : 'text-red-600'}>{atsPct}%</strong></span>
         </div>
       </div>
 
@@ -72,7 +75,7 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
         {content.summary && (
           <section>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1 flex items-center">
-              Summary<CopyBtn text={content.summary} />
+              {t('resume_section_summary')}<CopyBtn text={content.summary} />
             </h4>
             <p className="text-gray-800 leading-relaxed">{content.summary}</p>
           </section>
@@ -82,7 +85,7 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
         {content.skills && content.skills.length > 0 && (
           <section>
             <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5 flex items-center">
-              Selected Skills<CopyBtn text={content.skills.join(', ')} />
+              {t('resume_section_skills')}<CopyBtn text={content.skills.join(', ')} />
             </h4>
             <div className="flex flex-wrap gap-1.5">
               {content.skills.map((s, i) => (
@@ -95,7 +98,7 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
         {/* Projects */}
         {content.projects && content.projects.length > 0 && (
           <section>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Tailored Projects</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{t('resume_section_projects')}</h4>
             <div className="space-y-3">
               {content.projects.map((proj, i) => (
                 <div key={i}>
@@ -111,7 +114,7 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
                         {b.source_raw && b.source_raw !== b.rewritten && (
                           <details className="mt-0.5">
                             <summary className="text-xs text-gray-400 cursor-pointer hover:text-gray-600 list-none">
-                              ↩ original
+                              {t('resume_original_label')}
                             </summary>
                             <p className="text-xs text-gray-400 italic mt-0.5 pl-2">{b.source_raw}</p>
                           </details>
@@ -125,10 +128,10 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
           </section>
         )}
 
-        {/* Experience (passed through unchanged) */}
+        {/* Experience */}
         {content.experience && content.experience.length > 0 && (
           <section>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Experience</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{t('resume_section_experience')}</h4>
             <div className="space-y-2">
               {content.experience.map((exp, i) => (
                 <div key={i}>
@@ -156,6 +159,7 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
 
 // ── Cover letter panel ────────────────────────────────────────────────────────
 function CoverLetterPanel({ text }: { text: string }) {
+  const t = useT()
   const [copied, setCopied] = useState(false)
 
   function copy() {
@@ -168,12 +172,12 @@ function CoverLetterPanel({ text }: { text: string }) {
   return (
     <div className="border rounded-lg bg-white text-sm">
       <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 rounded-t-lg border-b">
-        <span className="font-semibold text-gray-700">📧 Cover Letter</span>
+        <span className="font-semibold text-gray-700">{t('cover_letter_title')}</span>
         <button
           onClick={copy}
           className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
         >
-          {copied ? '✓ Copied!' : 'Copy'}
+          {copied ? t('copied_done') : t('copy_btn')}
         </button>
       </div>
       <pre className="p-4 whitespace-pre-wrap text-gray-700 font-sans leading-relaxed text-xs max-h-64 overflow-y-auto">
@@ -208,6 +212,7 @@ function ActionButton({ label, onClick, loading, variant = 'default' }: {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Jobs() {
+  const t = useT()
   const [jobs, setJobs] = useState<Job[]>([])
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -281,7 +286,7 @@ export default function Jobs() {
       const r = await api.post(`/api/jobs/${jobId}/tailor`)
       setResume(r.data)
       if (r.data.docx_download_url) setDocxUrl(r.data.docx_download_url)
-      setActionMsg('✅ Resume tailored!')
+      setActionMsg(t('jobs_resume_tailored'))
     } catch (e: unknown) {
       setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Tailor failed')
     } finally { setActionLoading(null) }
@@ -294,7 +299,7 @@ export default function Jobs() {
       const r = await api.post(`/api/jobs/${jobId}/cover-letter`)
       const text = `Subject: ${r.data.subject_line}\n\n${r.data.body}`
       setCoverLetter(text)
-      setActionMsg('✅ Cover letter ready below.')
+      setActionMsg(t('jobs_cover_letter_ready'))
       await fetchJobs()
     } catch (e: unknown) {
       setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Generate cover letter failed')
@@ -316,7 +321,7 @@ export default function Jobs() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title / company…"
+            placeholder={t('jobs_search_placeholder')}
             className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select
@@ -325,14 +330,14 @@ export default function Jobs() {
             className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {STATUSES.map((s) => (
-              <option key={s} value={s}>{s === 'all' ? 'All statuses' : s}</option>
+              <option key={s} value={s}>{s === 'all' ? t('jobs_all_statuses') : s}</option>
             ))}
           </select>
         </div>
         <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-          {loading && <p className="text-sm text-gray-400 text-center mt-4">Loading…</p>}
+          {loading && <p className="text-sm text-gray-400 text-center mt-4">{t('jobs_loading')}</p>}
           {!loading && filtered.length === 0 && (
-            <p className="text-sm text-gray-400 text-center mt-4">No jobs found.</p>
+            <p className="text-sm text-gray-400 text-center mt-4">{t('jobs_none_found')}</p>
           )}
           {filtered.map((job) => (
             <JobCard key={job.id} job={job} selected={selected?.id === job.id} onClick={() => selectJob(job)} />
@@ -344,7 +349,7 @@ export default function Jobs() {
       <div className="flex-1 overflow-y-auto space-y-4">
         {!selected ? (
           <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
-            Select a job from the list
+            {t('jobs_select_prompt')}
           </div>
         ) : (
           <>
@@ -352,7 +357,7 @@ export default function Jobs() {
             <div className="bg-white rounded-lg shadow p-5 space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900">{selected.title || 'Untitled'}</h2>
+                  <h2 className="text-xl font-bold text-gray-900">{selected.title || t('jobs_untitled')}</h2>
                   <p className="text-gray-500">{selected.company}{selected.location ? ` · ${selected.location}` : ''}</p>
                   {selected.salary_range && <p className="text-sm text-gray-400 mt-0.5">{selected.salary_range}</p>}
                   {selected.source_url && (
@@ -362,7 +367,7 @@ export default function Jobs() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 mt-1 text-xs text-indigo-600 hover:text-indigo-800 hover:underline"
                     >
-                      🔗 View original posting
+                      {t('jobs_view_original')}
                     </a>
                   )}
                 </div>
@@ -374,7 +379,7 @@ export default function Jobs() {
               {/* Match score */}
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-sm font-medium text-gray-700">Match</span>
+                  <span className="text-sm font-medium text-gray-700">{t('jobs_match_label')}</span>
                   <span className={`text-sm font-bold ${selected.match_score >= 0.7 ? 'text-green-700' : selected.match_score >= 0.4 ? 'text-yellow-700' : 'text-red-600'}`}>
                     {Math.round(selected.match_score * 100)}%
                   </span>
@@ -392,13 +397,13 @@ export default function Jobs() {
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <p className="font-medium text-green-700 mb-1 text-xs">✅ Matches</p>
+                      <p className="font-medium text-green-700 mb-1 text-xs">{t('jobs_matches')}</p>
                       <ul className="space-y-0.5 text-gray-600 text-xs">
                         {selected.gap_analysis.strong_matches.map((m, i) => <li key={i}>• {m}</li>)}
                       </ul>
                     </div>
                     <div>
-                      <p className="font-medium text-red-600 mb-1 text-xs">⚠️ Gaps</p>
+                      <p className="font-medium text-red-600 mb-1 text-xs">{t('jobs_gaps')}</p>
                       <ul className="space-y-0.5 text-gray-600 text-xs">
                         {selected.gap_analysis.missing_skills.map((s, i) => <li key={i}>• {s}</li>)}
                       </ul>
@@ -408,7 +413,7 @@ export default function Jobs() {
                     onClick={() => setShowEval((v) => !v)}
                     className="text-xs text-indigo-600 hover:underline"
                   >
-                    {showEval ? '▲ Hide' : '▼ View'} Full Evaluation
+                    {showEval ? t('jobs_hide_eval') : t('jobs_view_eval')} {t('jobs_full_evaluation')}
                   </button>
                   {showEval && (
                     <div className="pt-1">
@@ -420,19 +425,19 @@ export default function Jobs() {
 
               {/* Actions */}
               <div className="flex flex-wrap gap-2 pt-1 border-t">
-                <ActionButton label="✅ Approve" onClick={() => updateStatus(selected.id, 'reviewed')} loading={actionLoading === 'status'} variant="success" />
-                <ActionButton label="❌ Dismiss" onClick={() => updateStatus(selected.id, 'dismissed')} loading={actionLoading === 'status'} variant="danger" />
-                <ActionButton label={actionLoading === 'tailor' ? 'Tailoring…' : '✂️ Tailor Resume'} onClick={() => tailor(selected.id)} loading={actionLoading === 'tailor'} />
+                <ActionButton label={t('jobs_approve')} onClick={() => updateStatus(selected.id, 'reviewed')} loading={actionLoading === 'status'} variant="success" />
+                <ActionButton label={t('jobs_dismiss')} onClick={() => updateStatus(selected.id, 'dismissed')} loading={actionLoading === 'status'} variant="danger" />
+                <ActionButton label={actionLoading === 'tailor' ? t('jobs_tailoring') : t('jobs_tailor_btn')} onClick={() => tailor(selected.id)} loading={actionLoading === 'tailor'} />
                 {docxUrl && (
                   <a
                     href={docxUrl}
                     download
                     className="px-3 py-1.5 rounded text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
                   >
-                    ⬇ Download Word
+                    {t('jobs_download_word')}
                   </a>
                 )}
-                <ActionButton label={actionLoading === 'apply' ? 'Generating…' : '📧 Cover Letter'} onClick={() => apply(selected.id)} loading={actionLoading === 'apply'} />
+                <ActionButton label={actionLoading === 'apply' ? t('jobs_cover_generating') : t('jobs_cover_letter_btn')} onClick={() => apply(selected.id)} loading={actionLoading === 'apply'} />
               </div>
 
               {actionMsg && (
@@ -444,7 +449,7 @@ export default function Jobs() {
               {/* JD toggle */}
               <div>
                 <button onClick={() => setShowJD((v) => !v)} className="text-xs text-blue-600 hover:underline">
-                  {showJD ? '▲ Hide' : '▼ Show'} Full Job Description
+                  {showJD ? t('jobs_hide_jd') : t('jobs_show_jd')} {t('jobs_full_jd')}
                 </button>
                 {showJD && (
                   <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 rounded p-3 max-h-52 overflow-y-auto">
@@ -456,7 +461,7 @@ export default function Jobs() {
               {/* Required skills */}
               {selected.skills_required.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-gray-600 mb-1.5">Required Skills</p>
+                  <p className="text-xs font-medium text-gray-600 mb-1.5">{t('jobs_required_skills')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {selected.skills_required.map((s) => (
                       <span key={s} className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">{s}</span>

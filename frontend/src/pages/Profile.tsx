@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import type { Education, Experience, Preferences, Project, Skill, UserProfile } from '../api/client'
+import { useT } from '../contexts/LanguageContext'
 
 const EMPTY_PROFILE: UserProfile = {
   name: '',
@@ -24,6 +25,7 @@ function TagListEditor({
   onChange: (v: string[]) => void
   placeholder?: string
 }) {
+  const t = useT()
   const [input, setInput] = useState('')
 
   function add() {
@@ -50,7 +52,7 @@ function TagListEditor({
           placeholder={placeholder}
           className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <button onClick={add} className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Add</button>
+        <button onClick={add} className="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">{t('skill_add_btn')}</button>
       </div>
     </div>
   )
@@ -74,6 +76,7 @@ function parseDuration(s: string) {
 }
 
 function DurationPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useT()
   const { sy, sm, ey, em, isPresent } = parseDuration(value)
 
   function emit(next: { sy: string; sm: string; ey: string; em: string; isPresent: boolean }) {
@@ -87,36 +90,36 @@ function DurationPicker({ value, onChange }: { value: string; onChange: (v: stri
   return (
     <div className="flex flex-wrap items-center gap-1">
       <select value={sy} onChange={(e) => emit({ sy: e.target.value, sm, ey, em, isPresent })} className={sel}>
-        <option value="">Year</option>
+        <option value="">{t('duration_year')}</option>
         {YEAR_OPTS.map((y) => <option key={y}>{y}</option>)}
       </select>
       <select value={sm} onChange={(e) => emit({ sy, sm: e.target.value, ey, em, isPresent })} className={sel}>
-        <option value="">Month</option>
+        <option value="">{t('duration_month')}</option>
         {MONTH_OPTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
       </select>
       <span className="text-gray-400 text-sm">~</span>
       {isPresent ? (
         <>
-          <span className="text-gray-500 text-sm px-1">Present</span>
+          <span className="text-gray-500 text-sm px-1">{t('duration_present')}</span>
           <button
             onClick={() => emit({ sy, sm, ey: String(CUR_YEAR), em: '', isPresent: false })}
             className="text-xs text-blue-500 hover:underline"
-          >set end</button>
+          >{t('duration_set_end')}</button>
         </>
       ) : (
         <>
           <select value={ey} onChange={(e) => emit({ sy, sm, ey: e.target.value, em, isPresent })} className={sel}>
-            <option value="">Year</option>
+            <option value="">{t('duration_year')}</option>
             {YEAR_OPTS.map((y) => <option key={y}>{y}</option>)}
           </select>
           <select value={em} onChange={(e) => emit({ sy, sm, ey, em: e.target.value, isPresent })} className={sel}>
-            <option value="">Month</option>
+            <option value="">{t('duration_month')}</option>
             {MONTH_OPTS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
           </select>
           <button
             onClick={() => emit({ sy, sm, ey: '', em: '', isPresent: true })}
             className="text-xs text-blue-500 hover:underline"
-          >Present</button>
+          >{t('duration_present')}</button>
         </>
       )}
     </div>
@@ -125,10 +128,11 @@ function DurationPicker({ value, onChange }: { value: string; onChange: (v: stri
 
 // ── Basic tab ────────────────────────────────────────────────────────────────
 function BasicTab({ profile, onChange }: { profile: UserProfile; onChange: (p: UserProfile) => void }) {
+  const t = useT()
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile_full_name')}</label>
         <input
           value={profile.name}
           onChange={(e) => onChange({ ...profile, name: e.target.value })}
@@ -136,11 +140,11 @@ function BasicTab({ profile, onChange }: { profile: UserProfile; onChange: (p: U
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Target Roles</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile_target_roles')}</label>
         <TagListEditor
           items={profile.target_roles}
           onChange={(v) => onChange({ ...profile, target_roles: v })}
-          placeholder="e.g. Backend Engineer"
+          placeholder={t('profile_target_roles_placeholder')}
         />
       </div>
     </div>
@@ -149,6 +153,7 @@ function BasicTab({ profile, onChange }: { profile: UserProfile; onChange: (p: U
 
 // ── Skills tab ───────────────────────────────────────────────────────────────
 function SkillsTab({ skills, onChange }: { skills: Skill[]; onChange: (s: Skill[]) => void }) {
+  const t = useT()
   const [newSkill, setNewSkill] = useState<Skill>({ name: '', level: 'intermediate', years: 1 })
 
   function add() {
@@ -162,9 +167,9 @@ function SkillsTab({ skills, onChange }: { skills: Skill[]; onChange: (s: Skill[
       <table className="w-full text-sm">
         <thead className="bg-gray-50">
           <tr>
-            <th className="text-left px-3 py-2 text-gray-600 font-medium">Skill</th>
-            <th className="text-left px-3 py-2 text-gray-600 font-medium">Level</th>
-            <th className="text-left px-3 py-2 text-gray-600 font-medium">Years</th>
+            <th className="text-left px-3 py-2 text-gray-600 font-medium">{t('skill_col_skill')}</th>
+            <th className="text-left px-3 py-2 text-gray-600 font-medium">{t('skill_col_level')}</th>
+            <th className="text-left px-3 py-2 text-gray-600 font-medium">{t('skill_col_years')}</th>
             <th className="px-3 py-2" />
           </tr>
         </thead>
@@ -200,7 +205,7 @@ function SkillsTab({ skills, onChange }: { skills: Skill[]; onChange: (s: Skill[
                 />
               </td>
               <td className="px-3 py-1.5">
-                <button onClick={() => onChange(skills.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                <button onClick={() => onChange(skills.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-xs">{t('skill_remove')}</button>
               </td>
             </tr>
           ))}
@@ -213,7 +218,7 @@ function SkillsTab({ skills, onChange }: { skills: Skill[]; onChange: (s: Skill[
             value={newSkill.name}
             onChange={(e) => setNewSkill({ ...newSkill, name: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && add()}
-            placeholder="Skill name"
+            placeholder={t('skill_name_placeholder')}
             className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -234,7 +239,7 @@ function SkillsTab({ skills, onChange }: { skills: Skill[]; onChange: (s: Skill[
           onChange={(e) => setNewSkill({ ...newSkill, years: Number(e.target.value) })}
           className="w-20 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <button onClick={add} className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Add</button>
+        <button onClick={add} className="px-4 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">{t('skill_add_btn')}</button>
       </div>
     </div>
   )
@@ -242,6 +247,7 @@ function SkillsTab({ skills, onChange }: { skills: Skill[]; onChange: (s: Skill[
 
 // ── Experience tab ───────────────────────────────────────────────────────────
 function ExperienceTab({ experience, onChange }: { experience: Experience[]; onChange: (e: Experience[]) => void }) {
+  const t = useT()
   function update(i: number, patch: Partial<Experience>) {
     onChange(experience.map((x, j) => j === i ? { ...x, ...patch } : x))
   }
@@ -260,22 +266,22 @@ function ExperienceTab({ experience, onChange }: { experience: Experience[]; onC
                 <input
                   value={exp.role}
                   onChange={(e) => update(i, { role: e.target.value })}
-                  placeholder="Role"
+                  placeholder={t('exp_role_placeholder')}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                 />
                 <input
                   value={exp.company}
                   onChange={(e) => update(i, { company: e.target.value })}
-                  placeholder="Company"
+                  placeholder={t('exp_company_placeholder')}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                 />
               </div>
               <DurationPicker value={exp.duration} onChange={(v) => update(i, { duration: v })} />
             </div>
-            <button onClick={() => onChange(experience.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-sm">Remove</button>
+            <button onClick={() => onChange(experience.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-sm">{t('exp_remove')}</button>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-600 mb-1">Bullets ({exp.bullets.length})</p>
+            <p className="text-xs font-medium text-gray-600 mb-1">{t('exp_bullets_label')} ({exp.bullets.length})</p>
             <div className="space-y-1">
               {exp.bullets.map((b, k) => (
                 <div key={k} className="flex gap-1">
@@ -298,13 +304,13 @@ function ExperienceTab({ experience, onChange }: { experience: Experience[]; onC
               onClick={() => update(i, { bullets: [...exp.bullets, { raw: '', tech: [], metric: '' }] })}
               className="mt-1 text-xs text-blue-600 hover:underline"
             >
-              + Add bullet
+              {t('exp_add_bullet')}
             </button>
           </div>
         </div>
       ))}
       <button onClick={addExp} className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
-        + Add Experience
+        {t('exp_add_exp_btn')}
       </button>
     </div>
   )
@@ -312,6 +318,7 @@ function ExperienceTab({ experience, onChange }: { experience: Experience[]; onC
 
 // ── Projects tab ─────────────────────────────────────────────────────────────
 function ProjectsTab({ projects, onChange }: { projects: Project[]; onChange: (p: Project[]) => void }) {
+  const t = useT()
   function update(i: number, patch: Partial<Project>) {
     onChange(projects.map((x, j) => j === i ? { ...x, ...patch } : x))
   }
@@ -325,30 +332,30 @@ function ProjectsTab({ projects, onChange }: { projects: Project[]; onChange: (p
               <input
                 value={p.name}
                 onChange={(e) => update(i, { name: e.target.value })}
-                placeholder="Project name"
+                placeholder={t('proj_name_placeholder')}
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
               <input
                 value={p.description}
                 onChange={(e) => update(i, { description: e.target.value })}
-                placeholder="Description"
+                placeholder={t('proj_desc_placeholder')}
                 className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
             </div>
-            <button onClick={() => onChange(projects.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-sm">Remove</button>
+            <button onClick={() => onChange(projects.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-sm">{t('proj_remove')}</button>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-600 mb-1">Tech Stack</p>
+            <p className="text-xs font-medium text-gray-600 mb-1">{t('proj_tech_label')}</p>
             <div className="flex flex-wrap gap-1 mb-1">
-              {p.tech_stack.map((t) => (
-                <span key={t} className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs">
-                  {t}
-                  <button onClick={() => update(i, { tech_stack: p.tech_stack.filter((x) => x !== t) })} className="hover:text-red-600">×</button>
+              {p.tech_stack.map((tech) => (
+                <span key={tech} className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs">
+                  {tech}
+                  <button onClick={() => update(i, { tech_stack: p.tech_stack.filter((x) => x !== tech) })} className="hover:text-red-600">×</button>
                 </span>
               ))}
             </div>
             <input
-              placeholder="Add tech (press Enter)"
+              placeholder={t('proj_tech_placeholder')}
               className="border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -360,7 +367,7 @@ function ProjectsTab({ projects, onChange }: { projects: Project[]; onChange: (p
             />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-600 mb-1">Bullets ({p.bullets.length})</p>
+            <p className="text-xs font-medium text-gray-600 mb-1">{t('proj_bullets_label')} ({p.bullets.length})</p>
             <div className="space-y-1">
               {p.bullets.map((b, k) => (
                 <div key={k} className="flex gap-1">
@@ -383,7 +390,7 @@ function ProjectsTab({ projects, onChange }: { projects: Project[]; onChange: (p
               onClick={() => update(i, { bullets: [...p.bullets, { raw: '', tech: [], metric: '' }] })}
               className="mt-1 text-xs text-blue-600 hover:underline"
             >
-              + Add bullet
+              {t('proj_add_bullet')}
             </button>
           </div>
         </div>
@@ -392,7 +399,7 @@ function ProjectsTab({ projects, onChange }: { projects: Project[]; onChange: (p
         onClick={() => onChange([...projects, { name: '', description: '', tech_stack: [], bullets: [] }])}
         className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-purple-400 hover:text-purple-600 transition-colors"
       >
-        + Add Project
+        {t('proj_add_btn')}
       </button>
     </div>
   )
@@ -400,6 +407,7 @@ function ProjectsTab({ projects, onChange }: { projects: Project[]; onChange: (p
 
 // ── Education tab ─────────────────────────────────────────────────────────────
 function EducationTab({ education, onChange }: { education: Education[]; onChange: (e: Education[]) => void }) {
+  const t = useT()
   function update(i: number, patch: Partial<Education>) {
     onChange(education.map((x, j) => j === i ? { ...x, ...patch } : x))
   }
@@ -414,31 +422,31 @@ function EducationTab({ education, onChange }: { education: Education[]; onChang
                 <input
                   value={edu.institution}
                   onChange={(e) => update(i, { institution: e.target.value })}
-                  placeholder="Institution"
+                  placeholder={t('edu_institution_placeholder')}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                 />
                 <input
                   value={edu.degree}
                   onChange={(e) => update(i, { degree: e.target.value })}
-                  placeholder="Degree (e.g. Bachelor)"
+                  placeholder={t('edu_degree_placeholder')}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                 />
                 <input
                   value={edu.field}
                   onChange={(e) => update(i, { field: e.target.value })}
-                  placeholder="Field of study"
+                  placeholder={t('edu_field_placeholder')}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                 />
                 <input
                   value={edu.gpa}
                   onChange={(e) => update(i, { gpa: e.target.value })}
-                  placeholder="GPA (optional)"
+                  placeholder={t('edu_gpa_placeholder')}
                   className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
                 />
               </div>
               <DurationPicker value={edu.duration} onChange={(v) => update(i, { duration: v })} />
             </div>
-            <button onClick={() => onChange(education.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-sm">Remove</button>
+            <button onClick={() => onChange(education.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 text-sm">{t('edu_remove')}</button>
           </div>
         </div>
       ))}
@@ -446,7 +454,7 @@ function EducationTab({ education, onChange }: { education: Education[]; onChang
         onClick={() => onChange([...education, { institution: '', degree: '', field: '', duration: '', gpa: '' }])}
         className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
       >
-        + Add Education
+        {t('edu_add_btn')}
       </button>
     </div>
   )
@@ -454,30 +462,31 @@ function EducationTab({ education, onChange }: { education: Education[]; onChang
 
 // ── Preferences tab ──────────────────────────────────────────────────────────
 function PreferencesTab({ prefs, onChange }: { prefs: Preferences; onChange: (p: Preferences) => void }) {
+  const t = useT()
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Locations</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('pref_locations')}</label>
         <TagListEditor
           items={prefs.locations}
           onChange={(v) => onChange({ ...prefs, locations: v })}
-          placeholder="e.g. Sydney"
+          placeholder={t('pref_locations_placeholder')}
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Job Types</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">{t('pref_job_types')}</label>
         <TagListEditor
           items={prefs.job_types}
           onChange={(v) => onChange({ ...prefs, job_types: v })}
-          placeholder="e.g. full-time"
+          placeholder={t('pref_job_types_placeholder')}
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Salary Range</label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">{t('pref_salary')}</label>
         <div className="flex items-center gap-2">
           <input
             type="number"
-            placeholder="Min"
+            placeholder={t('pref_salary_min')}
             value={prefs.salary_range?.min ?? ''}
             onChange={(e) => onChange({ ...prefs, salary_range: { ...prefs.salary_range ?? { min: 0, max: 0, currency: 'AUD' }, min: Number(e.target.value) } })}
             className="w-28 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -485,7 +494,7 @@ function PreferencesTab({ prefs, onChange }: { prefs: Preferences; onChange: (p:
           <span className="text-gray-500">–</span>
           <input
             type="number"
-            placeholder="Max"
+            placeholder={t('pref_salary_max')}
             value={prefs.salary_range?.max ?? ''}
             onChange={(e) => onChange({ ...prefs, salary_range: { ...prefs.salary_range ?? { min: 0, max: 0, currency: 'AUD' }, max: Number(e.target.value) } })}
             className="w-28 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -493,7 +502,7 @@ function PreferencesTab({ prefs, onChange }: { prefs: Preferences; onChange: (p:
           <input
             value={prefs.salary_range?.currency ?? 'AUD'}
             onChange={(e) => onChange({ ...prefs, salary_range: { ...prefs.salary_range ?? { min: 0, max: 0, currency: 'AUD' }, currency: e.target.value } })}
-            placeholder="Currency"
+            placeholder={t('pref_salary_currency')}
             className="w-20 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -504,6 +513,7 @@ function PreferencesTab({ prefs, onChange }: { prefs: Preferences; onChange: (p:
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function Profile() {
+  const t = useT()
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE)
   const [tab, setTab] = useState<Tab>('basic')
   const [loading, setLoading] = useState(true)
@@ -531,7 +541,7 @@ export default function Profile() {
     setMsg('')
     try {
       await api.put('/api/profile', profile)
-      setMsg('✅ Profile saved!')
+      setMsg(t('profile_saved'))
     } catch (e: unknown) {
       const d = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Save failed'
       setMsg(d)
@@ -541,24 +551,24 @@ export default function Profile() {
   }
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'basic', label: 'Basic' },
-    { key: 'skills', label: `Skills (${(profile.skills ?? []).length})` },
-    { key: 'education', label: `Education (${(profile.education ?? []).length})` },
-    { key: 'experience', label: `Experience (${(profile.experience ?? []).length})` },
-    { key: 'projects', label: `Projects (${(profile.projects ?? []).length})` },
-    { key: 'preferences', label: 'Preferences' },
+    { key: 'basic', label: t('profile_tab_basic') },
+    { key: 'skills', label: `${t('profile_tab_skills')} (${(profile.skills ?? []).length})` },
+    { key: 'education', label: `${t('profile_tab_education')} (${(profile.education ?? []).length})` },
+    { key: 'experience', label: `${t('profile_tab_experience')} (${(profile.experience ?? []).length})` },
+    { key: 'projects', label: `${t('profile_tab_projects')} (${(profile.projects ?? []).length})` },
+    { key: 'preferences', label: t('profile_tab_preferences') },
   ]
 
   return (
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('profile_title')}</h1>
         <button
           onClick={save}
           disabled={saving || loading}
           className="px-5 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
         >
-          {saving ? 'Saving…' : '💾 Save Profile'}
+          {saving ? t('profile_saving') : t('profile_save_btn')}
         </button>
       </div>
 
@@ -569,7 +579,7 @@ export default function Profile() {
       )}
 
       {loading ? (
-        <p className="text-gray-400 text-sm">Loading…</p>
+        <p className="text-gray-400 text-sm">{t('profile_loading')}</p>
       ) : (
         <div className="bg-white rounded-lg shadow">
           {/* Tabs */}
