@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import type { Job } from '../api/client'
 import EvaluationReport from '../components/EvaluationReport'
+import { useT } from '../contexts/LanguageContext'
 
 function ScoreBar({ score }: { score: number }) {
   const pct = Math.round(score * 100)
@@ -19,6 +20,7 @@ function ScoreBar({ score }: { score: number }) {
 }
 
 export default function Scout() {
+  const t = useT()
   const [jd, setJd] = useState('')
   const [source, setSource] = useState('manual')
   const [loading, setLoading] = useState(false)
@@ -43,17 +45,17 @@ export default function Scout() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Scout — Analyse a Job</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('scout_title')}</h1>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Paste Job Description
+          {t('scout_jd_label')}
         </label>
         <textarea
           value={jd}
           onChange={(e) => setJd(e.target.value)}
           rows={10}
-          placeholder="Paste the full job description here…"
+          placeholder={t('scout_jd_placeholder')}
           className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-y"
         />
 
@@ -73,7 +75,7 @@ export default function Scout() {
             disabled={loading || !jd.trim()}
             className="px-5 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {loading ? 'Analysing…' : '🔍 Analyse'}
+            {loading ? t('scout_analysing') : t('scout_analyse_btn')}
           </button>
         </div>
 
@@ -96,7 +98,7 @@ export default function Scout() {
 
           {/* Match score */}
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-2">Match Score</h3>
+            <h3 className="text-sm font-medium text-gray-700 mb-2">{t('scout_match_score')}</h3>
             <ScoreBar score={result.match_score} />
           </div>
 
@@ -106,7 +108,7 @@ export default function Scout() {
           {/* Skills */}
           {result.skills_required.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Required Skills</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">{t('scout_required_skills')}</h3>
               <div className="flex flex-wrap gap-1.5">
                 {result.skills_required.map((s) => (
                   <span key={s} className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">{s}</span>
@@ -115,7 +117,7 @@ export default function Scout() {
             </div>
           )}
 
-          <p className="text-xs text-gray-400">Saved to Jobs as: <span className="font-mono">{result.id.slice(0, 8)}</span></p>
+          <p className="text-xs text-gray-400">{t('scout_saved_as')} <span className="font-mono">{result.id.slice(0, 8)}</span></p>
         </div>
       )}
     </div>

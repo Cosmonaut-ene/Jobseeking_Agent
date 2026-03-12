@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { api } from '../api/client'
 import type { Job } from '../api/client'
 import EvaluationReport from '../components/EvaluationReport'
+import { useT } from '../contexts/LanguageContext'
 
 interface TaskState {
   status: string
@@ -21,7 +22,7 @@ function ensurePolling(storageKey: string, taskId: string) {
   if (store.has(storageKey)) return
   const entry = {
     intervalId: null as any,
-    state: { status: 'running', progress: '运行中...' } as TaskState,
+    state: { status: 'running', progress: '...' } as TaskState,
     listeners: new Set<(s: TaskState) => void>(),
   }
   store.set(storageKey, entry)
@@ -36,12 +37,12 @@ function ensurePolling(storageKey: string, taskId: string) {
         sessionStorage.removeItem(storageKey)
       }
     } catch (err: any) {
-      // 404 = task gone (server restarted); stop polling and clear stale state
       if (err?.response?.status === 404) {
         clearInterval(entry.intervalId)
         store.delete(storageKey)
         sessionStorage.removeItem(storageKey)
-        const gone: TaskState = { status: 'error', progress: '任务已丢失（服务器已重启），请重新发起。' }
+        // task_lost message is shown dynamically via t() in the component
+        const gone: TaskState = { status: 'error', progress: '__task_lost__' }
         entry.listeners.forEach(fn => fn(gone))
       }
     }
@@ -63,24 +64,22 @@ function usePersistentTask(storageKey: string) {
   )
 
   useEffect(() => {
-    // Resume polling from sessionStorage if page was refreshed
     const savedId = sessionStorage.getItem(storageKey)
     if (savedId && !store.has(storageKey)) {
       ensurePolling(storageKey, savedId)
     }
-    // Subscribe to ongoing polling updates
     const entry = store.get(storageKey)
     if (!entry) return
     setTask(entry.state)
     const listener = (s: TaskState) => setTask(s)
     entry.listeners.add(listener)
-    return () => { entry.listeners.delete(listener) }  // unsubscribe only, polling keeps running
+    return () => { entry.listeners.delete(listener) }
   }, [storageKey])
 
   const startTask = (taskId: string) => {
     sessionStorage.setItem(storageKey, taskId)
     ensurePolling(storageKey, taskId)
-    setTask({ status: 'running', progress: '运行中...' })
+    setTask({ status: 'running', progress: '...' })
   }
 
   const cancelTask = async () => {
@@ -96,8 +95,10 @@ function usePersistentTask(storageKey: string) {
 }
 
 function TaskStatus({ task, onCancel }: { task: TaskState | null; onCancel: () => void }) {
+  const t = useT()
   if (!task) return null
   const isActive = task.status !== 'done' && task.status !== 'error'
+  const progressText = task.progress === '__task_lost__' ? t('scrapers_task_lost') : task.progress
   return (
     <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
       <div className="flex items-center justify-between">
@@ -107,19 +108,19 @@ function TaskStatus({ task, onCancel }: { task: TaskState | null; onCancel: () =
             task.status === 'error' ? 'bg-red-100 text-red-700' :
                                       'bg-blue-100 text-blue-700'
           }`}>{task.status}</span>
-          <span className="text-sm text-gray-600">{task.progress}</span>
+          <span className="text-sm text-gray-600">{progressText}</span>
         </div>
         {isActive && (
           <button
             onClick={onCancel}
             className="text-xs px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50"
           >
-            取消
+            {t('scrapers_cancel')}
           </button>
         )}
       </div>
       {task.results && (
-        <p className="text-sm text-green-700 font-medium mt-2">{task.results.length} jobs saved</p>
+        <p className="text-sm text-green-700 font-medium mt-2">{task.results.length} {t('scrapers_jobs_saved')}</p>
       )}
       {task.error && <p className="text-sm text-red-600 mt-2">{task.error}</p>}
     </div>
@@ -127,6 +128,8 @@ function TaskStatus({ task, onCancel }: { task: TaskState | null; onCancel: () =
 }
 
 export default function Scrapers() {
+  const t = useT()
+
   // Manual paste scout
   const [jd, setJd] = useState('')
   const [jdSource, setJdSource] = useState('manual')
@@ -143,7 +146,7 @@ export default function Scrapers() {
       const r = await api.post('/api/jobs/scout', { raw_jd: jd, source: jdSource, auto_filter: false })
       setJdResult(r.data)
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? '分析失败'
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? t('scrapers_analysis_failed')
       setJdError(msg)
     } finally {
       setJdLoading(false)
@@ -155,7 +158,6 @@ export default function Scrapers() {
   const [seekLoc, setSeekLoc] = useState('Sydney NSW')
   const [seekMax, setSeekMax] = useState(10)
   const { task: seekTask, startTask: startSeekTask, cancelTask: cancelSeek } = usePersistentTask('scraper_seek_task')
-
 
   // LinkedIn
   const [rssKeywords, setRssKeywords] = useState('Data Scientist, Machine Learning Engineer')
@@ -186,17 +188,17 @@ export default function Scrapers() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">爬虫控制台</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{t('scrapers_title')}</h1>
 
       {/* Manual paste */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-1">手动粘贴职位描述</h2>
-        <p className="text-sm text-gray-500 mb-4">粘贴任意来源的职位描述，立即获取 AI 评估报告。</p>
+        <h2 className="text-lg font-semibold mb-1">{t('scrapers_manual_title')}</h2>
+        <p className="text-sm text-gray-500 mb-4">{t('scrapers_manual_desc')}</p>
         <textarea
           value={jd}
           onChange={e => setJd(e.target.value)}
           rows={8}
-          placeholder="在此粘贴完整职位描述…"
+          placeholder={t('scrapers_manual_placeholder')}
           className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-3"
         />
         <div className="flex items-center gap-3">
@@ -215,7 +217,7 @@ export default function Scrapers() {
             disabled={jdLoading || !jd.trim()}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
           >
-            {jdLoading ? '⏳ 分析中…' : '🔍 分析'}
+            {jdLoading ? t('scrapers_analysing') : t('scrapers_analyse_btn')}
           </button>
         </div>
         {jdError && <p className="mt-3 text-sm text-red-600">{jdError}</p>}
@@ -231,7 +233,7 @@ export default function Scrapers() {
               </span>
             </div>
             <EvaluationReport gap={jdResult.gap_analysis} />
-            <p className="text-xs text-gray-400">已保存到 Jobs：<span className="font-mono">{jdResult.id.slice(0, 8)}</span></p>
+            <p className="text-xs text-gray-400">{t('scrapers_saved_to_jobs')}<span className="font-mono">{jdResult.id.slice(0, 8)}</span></p>
           </div>
         )}
       </div>
@@ -241,46 +243,44 @@ export default function Scrapers() {
         <h2 className="text-lg font-semibold mb-4">Seek.com.au</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">职位关键词 (逗号分隔)</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_job_keywords')}</label>
             <input className={inputCls} value={seekRoles} onChange={e => setSeekRoles(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">地点</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_location')}</label>
             <input className={inputCls} value={seekLoc} onChange={e => setSeekLoc(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">最大数量</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_max_results')}</label>
             <input className={inputCls} type="number" value={seekMax} onChange={e => setSeekMax(Number(e.target.value))} />
           </div>
         </div>
         <button className={btnCls} onClick={startSeek} disabled={seekTask?.status === 'running'}>
-          {seekTask?.status === 'running' ? '⏳ 爬取中...' : '🚀 开始爬取'}
+          {seekTask?.status === 'running' ? t('scrapers_seek_scraping') : t('scrapers_seek_start')}
         </button>
         <TaskStatus task={seekTask} onCancel={cancelSeek} />
       </div>
 
       {/* LinkedIn */}
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-2">LinkedIn (无需登录)</h2>
-        <p className="text-sm text-gray-500 mb-4">
-          通过 LinkedIn 公开接口搜索职位，无需账号，零封号风险。
-        </p>
+        <h2 className="text-lg font-semibold mb-2">{t('scrapers_linkedin_title')}</h2>
+        <p className="text-sm text-gray-500 mb-4">{t('scrapers_linkedin_desc')}</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">关键词 (逗号分隔)</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_keywords')}</label>
             <input className={inputCls} value={rssKeywords} onChange={e => setRssKeywords(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">地点</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_location')}</label>
             <input className={inputCls} value={rssLoc} onChange={e => setRssLoc(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">最大数量</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_max_results')}</label>
             <input className={inputCls} type="number" value={rssMax} onChange={e => setRssMax(Number(e.target.value))} />
           </div>
         </div>
         <button className={btnCls} onClick={startLinkedIn} disabled={rssTask?.status === 'running'}>
-          {rssTask?.status === 'running' ? '⏳ 爬取中...' : '🚀 LinkedIn 搜索'}
+          {rssTask?.status === 'running' ? t('scrapers_seek_scraping') : t('scrapers_linkedin_search')}
         </button>
         <TaskStatus task={rssTask} onCancel={cancelRss} />
       </div>
