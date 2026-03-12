@@ -9,6 +9,11 @@ MODEL = "gemini-2.5-flash"
 
 PARSE_SYSTEM = """You are a resume parser. Extract structured information from this resume text.
 
+CRITICAL: Only extract what is explicitly present in the text.
+- If a field (e.g. name, target_roles) is not found, return an empty string "" or empty array [].
+- Do NOT guess, fabricate, or fill in placeholder values like "Unknown", "N/A", "Not provided", etc.
+- The input may be a partial snippet (e.g. only one job entry). That is fine — return only what is there.
+
 For each skill, you MUST infer:
 - level: one of "beginner", "intermediate", or "expert"
   - "beginner":     < 1 year of use, or briefly mentioned without depth
