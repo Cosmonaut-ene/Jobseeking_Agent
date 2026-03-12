@@ -78,6 +78,10 @@ export default function Resume() {
       let existing: UserProfile | null = null
       try { existing = (await api.get('/api/profile')).data } catch { /* no existing profile */ }
 
+      const PLACEHOLDER_PATTERNS = /^(n\/a|unknown|not provided|not specified|none|null|undefined|-)$/i
+      const isReal = (v: string | null | undefined) =>
+        !!v && v.trim() !== '' && !PLACEHOLDER_PATTERNS.test(v.trim())
+
       const merged: UserProfile = {
         ...parsed,
         skills:     mergeSkills(existing?.skills ?? [], parsed.skills ?? []),
