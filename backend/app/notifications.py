@@ -1,22 +1,35 @@
-"""Push notifications via HTTP webhook (Telegram Bot API compatible)."""
+"""Push notifications via HTTP webhook (Telegram Bot API / Discord compatible)."""
 import logging
+import os
+import re
 import httpx
-from backend.app.config import NOTIFICATION_WEBHOOK_URL, NOTIFICATION_CHAT_ID
 from backend.app.models.job import Job
 
 logger = logging.getLogger(__name__)
 
 
+def _strip_html(text: str) -> str:
+    """Remove HTML tags for plain-text webhooks (e.g. Discord)."""
+    text = re.sub(r"<a[^>]+>", "", text)
+    return re.sub(r"<[^>]+>", "", text)
+
+
 def _send(text: str) -> bool:
     """Send a message via configured webhook. Returns True on success."""
-    if not NOTIFICATION_WEBHOOK_URL:
+    webhook_url = os.environ.get("NOTIFICATION_WEBHOOK_URL", "")
+    chat_id = os.environ.get("NOTIFICATION_CHAT_ID", "")
+    if not webhook_url:
         logger.info("[Notify] No webhook URL configured, skipping push.")
         return False
     try:
-        payload: dict = {"text": text, "parse_mode": "HTML"}
-        if NOTIFICATION_CHAT_ID:
-            payload["chat_id"] = NOTIFICATION_CHAT_ID
-        r = httpx.post(NOTIFICATION_WEBHOOK_URL, json=payload, timeout=10)
+        is_discord = "discord.com/api/webhooks" in webhook_url
+        if is_discord:
+            payload: dict = {"content": _strip_html(text)}
+        else:
+            payload = {"text": text, "parse_mode": "HTML"}
+            if chat_id:
+                payload["chat_id"] = chat_id
+        r = httpx.post(webhook_url, json=payload, timeout=10)
         r.raise_for_status()
         logger.info("[Notify] Push sent OK (%d)", r.status_code)
         return True
