@@ -14,21 +14,59 @@ interface TaskResult {
   error?: string
 }
 
+const STORAGE_KEY = 'notifications_scout_task'
+
+// Module-level store: polling survives page navigation
+const store: {
+  intervalId: ReturnType<typeof setInterval> | null
+  state: TaskResult | null
+  listeners: Set<(s: TaskResult | null) => void>
+} = { intervalId: null, state: null, listeners: new Set() }
+
+function ensurePolling(taskId: string) {
+  if (store.intervalId !== null) return
+  store.intervalId = setInterval(async () => {
+    try {
+      const r = await api.get(`/api/notifications/tasks/${taskId}`)
+      store.state = r.data
+      store.listeners.forEach(fn => fn(r.data))
+      if (r.data.status === 'done' || r.data.status === 'error') {
+        clearInterval(store.intervalId!)
+        store.intervalId = null
+        sessionStorage.removeItem(STORAGE_KEY)
+      }
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        clearInterval(store.intervalId!)
+        store.intervalId = null
+        sessionStorage.removeItem(STORAGE_KEY)
+        const gone: TaskResult = { status: 'error', progress: '任务已丢失（服务器已重启），请重新发起。' }
+        store.state = gone
+        store.listeners.forEach(fn => fn(gone))
+      }
+    }
+  }, 2000)
+}
+
 export default function Notifications() {
   const t = useT()
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<string | null>(null)
   const [triggering, setTriggering] = useState(false)
-  const [taskId, setTaskId] = useState<string | null>(null)
-  const [task, setTask] = useState<TaskResult | null>(null)
+  const [task, setTask] = useState<TaskResult | null>(() => store.state)
 
   useEffect(() => {
-    if (!taskId || task?.status === 'done' || task?.status === 'error') return
-    const interval = setInterval(() => {
-      api.get(`/api/notifications/tasks/${taskId}`).then(r => setTask(r.data)).catch(() => {})
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [taskId, task?.status])
+    // Resume polling if page was refreshed and task was in progress
+    const savedId = sessionStorage.getItem(STORAGE_KEY)
+    if (savedId && store.intervalId === null && (!store.state || store.state.status === 'running')) {
+      ensurePolling(savedId)
+    }
+    // Subscribe to updates
+    const listener = (s: TaskResult | null) => setTask(s)
+    store.listeners.add(listener)
+    if (store.state) setTask(store.state)
+    return () => { store.listeners.delete(listener) }
+  }, [])
 
   const testNotification = async () => {
     setTesting(true)
@@ -45,13 +83,20 @@ export default function Notifications() {
 
   const triggerScout = async () => {
     setTriggering(true)
+    store.state = null
     setTask(null)
     try {
       const r = await api.post('/api/notifications/trigger-scout')
-      setTaskId(r.data.task_id)
-      setTask({ status: 'running', progress: 'Starting...' })
+      const taskId = r.data.task_id
+      sessionStorage.setItem(STORAGE_KEY, taskId)
+      const initial: TaskResult = { status: 'running', progress: 'Starting...' }
+      store.state = initial
+      setTask(initial)
+      ensurePolling(taskId)
     } catch (e: any) {
-      setTask({ status: 'error', progress: e.response?.data?.detail || e.message })
+      const errState: TaskResult = { status: 'error', progress: e.response?.data?.detail || e.message }
+      store.state = errState
+      setTask(errState)
     } finally {
       setTriggering(false)
     }

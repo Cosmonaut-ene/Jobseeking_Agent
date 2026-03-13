@@ -39,6 +39,10 @@ def run_daily_scout(settings: dict | None = None) -> dict[str, Any]:
     locations = settings.get("locations", profile.preferences.locations or ["Australia"])
     max_jobs = settings.get("max_per_scraper", DEFAULT_MAX_JOBS)
 
+    if not roles:
+        logger.error("[Scheduler] No target roles configured — aborting daily scout.")
+        return {"error": "No target roles configured. Please fill in target_roles in your Profile page."}
+
     existing = _existing_urls()
     scout = ScoutAgent()
     stats: dict[str, int] = {"seek": 0, "linkedin": 0}

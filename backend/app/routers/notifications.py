@@ -36,7 +36,10 @@ def trigger_scout() -> dict:
             if settings_file.exists():
                 settings = json.loads(settings_file.read_text()).get("scraper_config", {})
             result = run_daily_scout(settings)
-            _tasks[task_id].update(status="done", progress="Complete", result=result)
+            if "error" in result:
+                _tasks[task_id].update(status="error", progress=result["error"], error=result["error"])
+            else:
+                _tasks[task_id].update(status="done", progress="Complete", result=result)
         except Exception as e:
             _tasks[task_id].update(status="error", progress=str(e), error=str(e))
 

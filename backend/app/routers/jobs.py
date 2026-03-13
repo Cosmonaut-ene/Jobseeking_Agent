@@ -55,8 +55,10 @@ def get_job(job_id: str) -> dict:
             .where(ResumeVersion.job_id == job_id)
             .order_by(ResumeVersion.created_at.desc())
         ).all()
+    from backend.app.config import RESUMES_DIR
     result = jsonable_encoder(job)
     result["resume_versions"] = jsonable_encoder(versions)
+    result["has_docx"] = (RESUMES_DIR / f"tailored_{job_id}.docx").exists()
     return result
 
 
@@ -129,17 +131,12 @@ def tailor_job(job_id: str) -> dict:
             session.commit()
             session.refresh(resume_version)
             result = jsonable_encoder(resume_version)
-            # Generate PDF
-            try:
-                from backend.app.pdf_generator import generate_resume_pdf
-                from backend.app.config import RESUMES_DIR
-                template_path = Path(__file__).parents[3] / "templates" / "resume.html"
-                output_path = RESUMES_DIR / f"tailored_{job_id}.pdf"
-                generate_resume_pdf(resume_version.content_json or {}, profile, template_path, output_path)
-                result["pdf_download_url"] = f"/api/files/{job_id}/resume.pdf"
-            except Exception as pdf_err:
-                import logging
-                logging.getLogger(__name__).warning("PDF generation failed: %s", pdf_err)
+            # Generate Word resume
+            from backend.app.docx_generator import generate_tailored_resume
+            from backend.app.config import RESUMES_DIR
+            output_path = RESUMES_DIR / f"tailored_{job_id}.docx"
+            generate_tailored_resume(resume_version.content_json or {}, profile, output_path)
+            result["docx_download_url"] = f"/api/files/{job_id}/resume.docx"
             return result
     except HTTPException:
         raise

@@ -46,6 +46,14 @@ async def upload_resume(file: UploadFile = File(...)) -> dict:
         # Save parsed profile
         PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
         PROFILE_PATH.write_text(json.dumps(profile_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        # Generate base Word resume (non-fatal)
+        try:
+            from backend.app.docx_generator import generate_base_resume
+            from backend.app.models.user_profile import UserProfile
+            profile = UserProfile.model_validate(profile_data)
+            generate_base_resume(profile)
+        except Exception as e:
+            logger.warning("Base resume generation failed: %s", e)
         return {"parsed": True, "profile": profile_data}
     except Exception as e:
         logger.exception("Error parsing uploaded resume: %s", e)
