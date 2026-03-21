@@ -11,6 +11,16 @@ interface TaskState {
   error?: string
 }
 
+// Module-level scraper inputs — persists across page navigation
+const _inputs = {
+  seekRoles: null as string | null,   // null = not yet loaded from profile
+  seekLoc:   null as string | null,
+  seekMax:   10,
+  liKeywords: null as string | null,
+  liLoc:      null as string | null,
+  liMax:      25,
+}
+
 // Module-level store: polling lives outside React, survives component unmount/remount
 const store = new Map<string, {
   intervalId: ReturnType<typeof setInterval>
@@ -153,17 +163,39 @@ export default function Scrapers() {
     }
   }
 
-  // Seek
-  const [seekRoles, setSeekRoles] = useState('Data Scientist, ML Engineer')
-  const [seekLoc, setSeekLoc] = useState('Sydney NSW')
-  const [seekMax, setSeekMax] = useState(10)
+  // Seek — initialise from module-level cache (persists across navigation)
+  const [seekRoles, _setSeekRoles] = useState(_inputs.seekRoles ?? '')
+  const [seekLoc,   _setSeekLoc]   = useState(_inputs.seekLoc   ?? '')
+  const [seekMax,   _setSeekMax]   = useState(_inputs.seekMax)
+  const setSeekRoles = (v: string)  => { _inputs.seekRoles = v; _setSeekRoles(v) }
+  const setSeekLoc   = (v: string)  => { _inputs.seekLoc   = v; _setSeekLoc(v) }
+  const setSeekMax   = (v: number)  => { _inputs.seekMax   = v; _setSeekMax(v) }
   const { task: seekTask, startTask: startSeekTask, cancelTask: cancelSeek } = usePersistentTask('scraper_seek_task')
 
-  // LinkedIn
-  const [rssKeywords, setRssKeywords] = useState('Data Scientist, Machine Learning Engineer')
-  const [rssLoc, setRssLoc] = useState('Sydney, New South Wales, Australia')
-  const [rssMax, setRssMax] = useState(25)
+  // LinkedIn — same pattern
+  const [rssKeywords, _setRssKeywords] = useState(_inputs.liKeywords ?? '')
+  const [rssLoc,      _setRssLoc]      = useState(_inputs.liLoc      ?? '')
+  const [rssMax,      _setRssMax]      = useState(_inputs.liMax)
+  const setRssKeywords = (v: string) => { _inputs.liKeywords = v; _setRssKeywords(v) }
+  const setRssLoc      = (v: string) => { _inputs.liLoc      = v; _setRssLoc(v) }
+  const setRssMax      = (v: number) => { _inputs.liMax      = v; _setRssMax(v) }
   const { task: rssTask, startTask: startRssTask, cancelTask: cancelRss } = usePersistentTask('scraper_rss_task')
+
+  // Load profile defaults once (only when _inputs hasn't been populated yet)
+  useEffect(() => {
+    if (_inputs.seekRoles !== null) return   // already loaded or user has edited
+    api.get('/api/profile').then(r => {
+      const roles = (r.data.target_roles as string[] | undefined)?.join(', ') ?? ''
+      const loc   = (r.data.preferences?.locations as string[] | undefined)?.[0] ?? ''
+      setSeekRoles(roles)
+      setSeekLoc(loc)
+      setRssKeywords(roles)
+      setRssLoc(loc)
+    }).catch(() => {
+      // profile not set up yet — leave fields empty
+      _inputs.seekRoles = ''
+    })
+  }, [])
 
   const startSeek = async () => {
     const r = await api.post('/api/scrapers/seek', {

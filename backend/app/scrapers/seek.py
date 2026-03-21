@@ -1,7 +1,7 @@
 """Seek.com.au 全自动爬虫."""
 import random
+import re
 import time
-from urllib.parse import quote_plus
 from playwright.sync_api import Page, sync_playwright
 from backend.app.scrapers import ScrapedJob
 
@@ -60,12 +60,30 @@ class SeekScraper:
 
         return results
 
-    def _search(self, page: Page, role: str, location: str, max_jobs: int, existing_urls: set[str]) -> list[str]:
-        search_url = (
-            f"{self.BASE}/jobs?keywords={quote_plus(role)}"
-            f"&where={quote_plus(location)}"
-            f"&dateRange=7d&sortMode=ListedDate"
+    @staticmethod
+    def _to_slug(text: str) -> str:
+        """Convert text to SEEK URL slug (lowercase, spaces/special chars → hyphens)."""
+        text = text.lower().strip()
+        text = re.sub(r"[^\w\s-]", "", text)      # remove punctuation except hyphens
+        text = re.sub(r"[\s_]+", "-", text)        # spaces → hyphens
+        text = re.sub(r"-+", "-", text).strip("-") # collapse multiple hyphens
+        return text
+
+    def _build_search_url(self, role: str, location: str) -> str:
+        """Build SEEK path-based search URL.
+
+        Example: developer + Sydney NSW
+          → https://www.seek.com.au/developer-jobs/in-All-Sydney-NSW/full-time?daterange=7&sortmode=ListedDate
+        """
+        role_slug = self._to_slug(role)
+        loc_slug = self._to_slug(location)
+        return (
+            f"{self.BASE}/{role_slug}-jobs/in-All-{loc_slug}/full-time"
+            f"?daterange=7&sortmode=ListedDate"
         )
+
+    def _search(self, page: Page, role: str, location: str, max_jobs: int, existing_urls: set[str]) -> list[str]:
+        search_url = self._build_search_url(role, location)
         try:
             page.goto(search_url, wait_until="domcontentloaded", timeout=30_000)
             _delay(1.5, 3.0)
