@@ -1,5 +1,7 @@
 # Jobseeking Agent
 
+> Built this tool to automate my own job search while applying for roles in Sydney's AI market. The manual process of screening listings, tailoring resumes, and tracking applications was time-consuming and inconsistent — so I automated it.
+
 An AI-powered personal job search automation platform. It scrapes job boards daily, scores each listing against your resume with a detailed 5-section evaluation report, generates tailored application materials, and pushes instant notifications — requiring minimal daily effort.
 
 > **Stack**: FastAPI · SQLite · React 18 · TypeScript · Tailwind CSS · Gemini 2.5 Flash
