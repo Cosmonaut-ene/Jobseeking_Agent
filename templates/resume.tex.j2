@@ -1,0 +1,95 @@
+\documentclass[10pt,a4paper]{article}
+
+% ---------- packages ----------
+\usepackage[a4paper, top=14mm, bottom=14mm, left=15mm, right=15mm]{geometry}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{multicol}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{fontenc}
+\usepackage[utf8]{inputenc}
+
+% ---------- colours ----------
+\definecolor{accent}{RGB}{30,90,160}
+\definecolor{rule}{RGB}{180,180,180}
+
+% ---------- section style ----------
+\titleformat{\section}
+  {\large\bfseries\color{accent}}
+  {}{0em}{}
+  [\vspace{-4pt}\color{rule}\hrule\vspace{4pt}]
+\titlespacing{\section}{0pt}{10pt}{4pt}
+
+% ---------- misc ----------
+\setlength{\parindent}{0pt}
+\pagestyle{empty}
+\hypersetup{colorlinks=true,urlcolor=accent}
+
+% ===========================
+\begin{document}
+
+% --- NAME HEADER ---
+{\fontsize{22pt}{26pt}\selectfont\bfseries\color{accent} \VAR{name}}
+\vspace{6pt}
+
+% --- SUMMARY ---
+\BLOCK{if summary}
+\section*{Summary}
+\VAR{summary}
+\BLOCK{endif}
+
+% --- SKILLS ---
+\BLOCK{if skills}
+\section*{Skills}
+\begin{multicols}{2}
+\begin{itemize}[leftmargin=1em, itemsep=0pt, topsep=2pt]
+\BLOCK{for skill in skills}
+  \item \VAR{skill}
+\BLOCK{endfor}
+\end{itemize}
+\end{multicols}
+\BLOCK{endif}
+
+% --- EXPERIENCE ---
+\BLOCK{if experience}
+\section*{Experience}
+\BLOCK{for exp in experience}
+\textbf{\VAR{exp.role}} \hfill \textit{\VAR{exp.duration}} \\
+\textit{\VAR{exp.company}}
+\begin{itemize}[leftmargin=1.5em, itemsep=1pt, topsep=2pt]
+\BLOCK{for b in exp.bullets}
+  \item \VAR{b}
+\BLOCK{endfor}
+\end{itemize}
+\vspace{2pt}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% --- PROJECTS ---
+\BLOCK{if projects}
+\section*{Projects}
+\BLOCK{for proj in projects}
+\textbf{\VAR{proj.name}}
+\begin{itemize}[leftmargin=1.5em, itemsep=1pt, topsep=2pt]
+\BLOCK{for b in proj.bullets}
+  \item \VAR{b}
+\BLOCK{endfor}
+\end{itemize}
+\vspace{2pt}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+% --- EDUCATION ---
+\BLOCK{if education}
+\section*{Education}
+\BLOCK{for edu in education}
+\textbf{\VAR{edu.label}} \hfill \textit{\VAR{edu.duration}} \\
+\VAR{edu.institution}
+\vspace{4pt}
+\BLOCK{endfor}
+\BLOCK{endif}
+
+\end{document}

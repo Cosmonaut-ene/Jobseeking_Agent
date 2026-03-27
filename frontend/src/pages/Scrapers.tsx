@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Search, Play, Loader2 } from 'lucide-react'
 import { api } from '../api/client'
 import type { Job } from '../api/client'
 import EvaluationReport from '../components/EvaluationReport'
@@ -51,7 +52,6 @@ function ensurePolling(storageKey: string, taskId: string) {
         clearInterval(entry.intervalId)
         store.delete(storageKey)
         sessionStorage.removeItem(storageKey)
-        // task_lost message is shown dynamically via t() in the component
         const gone: TaskState = { status: 'error', progress: '__task_lost__' }
         entry.listeners.forEach(fn => fn(gone))
       }
@@ -110,29 +110,29 @@ function TaskStatus({ task, onCancel }: { task: TaskState | null; onCancel: () =
   const isActive = task.status !== 'done' && task.status !== 'error'
   const progressText = task.progress === '__task_lost__' ? t('scrapers_task_lost') : task.progress
   return (
-    <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+    <div className="mt-4 p-4 bg-slate-50/70 dark:bg-zinc-800/50 rounded-xl border border-slate-200/60 dark:border-zinc-700/60">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`px-2 py-1 rounded text-xs font-medium ${
-            task.status === 'done'  ? 'bg-green-100 text-green-700' :
-            task.status === 'error' ? 'bg-red-100 text-red-700' :
-                                      'bg-blue-100 text-blue-700'
+          <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+            task.status === 'done'  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' :
+            task.status === 'error' ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' :
+                                      'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
           }`}>{task.status}</span>
-          <span className="text-sm text-gray-600">{progressText}</span>
+          <span className="text-sm text-slate-600 dark:text-slate-300">{progressText}</span>
         </div>
         {isActive && (
           <button
             onClick={onCancel}
-            className="text-xs px-2 py-1 rounded border border-red-300 text-red-600 hover:bg-red-50"
+            className="text-xs px-2 py-1 rounded-md border border-rose-300 dark:border-rose-500/50 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
           >
             {t('scrapers_cancel')}
           </button>
         )}
       </div>
       {task.results && (
-        <p className="text-sm text-green-700 font-medium mt-2">{task.results.length} {t('scrapers_jobs_saved')}</p>
+        <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium mt-2">{task.results.length} {t('scrapers_jobs_saved')}</p>
       )}
-      {task.error && <p className="text-sm text-red-600 mt-2">{task.error}</p>}
+      {task.error && <p className="text-sm text-rose-600 dark:text-rose-400 mt-2">{task.error}</p>}
     </div>
   )
 }
@@ -183,7 +183,7 @@ export default function Scrapers() {
 
   // Load profile defaults once (only when _inputs hasn't been populated yet)
   useEffect(() => {
-    if (_inputs.seekRoles !== null) return   // already loaded or user has edited
+    if (_inputs.seekRoles !== null) return
     api.get('/api/profile').then(r => {
       const roles = (r.data.target_roles as string[] | undefined)?.join(', ') ?? ''
       const loc   = (r.data.preferences?.locations as string[] | undefined)?.[0] ?? ''
@@ -192,7 +192,6 @@ export default function Scrapers() {
       setRssKeywords(roles)
       setRssLoc(loc)
     }).catch(() => {
-      // profile not set up yet — leave fields empty
       _inputs.seekRoles = ''
     })
   }, [])
@@ -215,29 +214,29 @@ export default function Scrapers() {
     startRssTask(r.data.task_id)
   }
 
-  const inputCls = 'w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400'
-  const btnCls = 'bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50'
+  const inputCls = 'w-full border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 text-slate-900 dark:text-slate-100 backdrop-blur-sm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400'
+  const btnCls = 'bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors shadow-sm'
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{t('scrapers_title')}</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('scrapers_title')}</h1>
 
       {/* Manual paste */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-1">{t('scrapers_manual_title')}</h2>
-        <p className="text-sm text-gray-500 mb-4">{t('scrapers_manual_desc')}</p>
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-1">{t('scrapers_manual_title')}</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t('scrapers_manual_desc')}</p>
         <textarea
           value={jd}
           onChange={e => setJd(e.target.value)}
           rows={8}
           placeholder={t('scrapers_manual_placeholder')}
-          className="w-full border rounded-lg px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-3"
+          className="w-full border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 text-slate-900 dark:text-slate-100 backdrop-blur-sm rounded-lg px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 mb-3"
         />
         <div className="flex items-center gap-3">
           <select
             value={jdSource}
             onChange={e => setJdSource(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 text-slate-900 dark:text-slate-100 backdrop-blur-sm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400"
           >
             <option value="manual">Manual</option>
             <option value="seek">Seek</option>
@@ -247,71 +246,74 @@ export default function Scrapers() {
           <button
             onClick={analyzeJd}
             disabled={jdLoading || !jd.trim()}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+            className={`inline-flex items-center gap-1.5 ${btnCls}`}
           >
+            {jdLoading ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
             {jdLoading ? t('scrapers_analysing') : t('scrapers_analyse_btn')}
           </button>
         </div>
-        {jdError && <p className="mt-3 text-sm text-red-600">{jdError}</p>}
+        {jdError && <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{jdError}</p>}
         {jdResult && (
           <div className="mt-5 space-y-3">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-semibold text-gray-900">{jdResult.title}</p>
-                <p className="text-sm text-gray-500">{jdResult.company}{jdResult.location ? ` · ${jdResult.location}` : ''}</p>
+                <p className="font-semibold text-slate-900 dark:text-slate-100">{jdResult.title}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{jdResult.company}{jdResult.location ? ` · ${jdResult.location}` : ''}</p>
               </div>
-              <span className={`text-sm font-bold ${jdResult.match_score >= 0.7 ? 'text-green-700' : jdResult.match_score >= 0.4 ? 'text-yellow-700' : 'text-red-600'}`}>
+              <span className={`text-sm font-bold ${jdResult.match_score >= 0.7 ? 'text-emerald-700 dark:text-emerald-400' : jdResult.match_score >= 0.4 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
                 {Math.round(jdResult.match_score * 100)}%
               </span>
             </div>
             <EvaluationReport gap={jdResult.gap_analysis} />
-            <p className="text-xs text-gray-400">{t('scrapers_saved_to_jobs')}<span className="font-mono">{jdResult.id.slice(0, 8)}</span></p>
+            <p className="text-xs text-slate-400 dark:text-zinc-500">{t('scrapers_saved_to_jobs')}<span className="font-mono">{jdResult.id.slice(0, 8)}</span></p>
           </div>
         )}
       </div>
 
       {/* Seek */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Seek.com.au</h2>
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Seek.com.au</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_job_keywords')}</label>
+            <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">{t('scrapers_job_keywords')}</label>
             <input className={inputCls} value={seekRoles} onChange={e => setSeekRoles(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_location')}</label>
+            <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">{t('scrapers_location')}</label>
             <input className={inputCls} value={seekLoc} onChange={e => setSeekLoc(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_max_results')}</label>
+            <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">{t('scrapers_max_results')}</label>
             <input className={inputCls} type="number" value={seekMax} onChange={e => setSeekMax(Number(e.target.value))} />
           </div>
         </div>
-        <button className={btnCls} onClick={startSeek} disabled={seekTask?.status === 'running'}>
+        <button className={`inline-flex items-center gap-1.5 ${btnCls}`} onClick={startSeek} disabled={seekTask?.status === 'running'}>
+          {seekTask?.status === 'running' ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
           {seekTask?.status === 'running' ? t('scrapers_seek_scraping') : t('scrapers_seek_start')}
         </button>
         <TaskStatus task={seekTask} onCancel={cancelSeek} />
       </div>
 
       {/* LinkedIn */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold mb-2">{t('scrapers_linkedin_title')}</h2>
-        <p className="text-sm text-gray-500 mb-4">{t('scrapers_linkedin_desc')}</p>
+      <div className="glass-card p-6">
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">{t('scrapers_linkedin_title')}</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t('scrapers_linkedin_desc')}</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_keywords')}</label>
+            <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">{t('scrapers_keywords')}</label>
             <input className={inputCls} value={rssKeywords} onChange={e => setRssKeywords(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_location')}</label>
+            <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">{t('scrapers_location')}</label>
             <input className={inputCls} value={rssLoc} onChange={e => setRssLoc(e.target.value)} />
           </div>
           <div>
-            <label className="block text-xs text-gray-500 mb-1">{t('scrapers_max_results')}</label>
+            <label className="block text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">{t('scrapers_max_results')}</label>
             <input className={inputCls} type="number" value={rssMax} onChange={e => setRssMax(Number(e.target.value))} />
           </div>
         </div>
-        <button className={btnCls} onClick={startLinkedIn} disabled={rssTask?.status === 'running'}>
+        <button className={`inline-flex items-center gap-1.5 ${btnCls}`} onClick={startLinkedIn} disabled={rssTask?.status === 'running'}>
+          {rssTask?.status === 'running' ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
           {rssTask?.status === 'running' ? t('scrapers_seek_scraping') : t('scrapers_linkedin_search')}
         </button>
         <TaskStatus task={rssTask} onCancel={cancelRss} />
