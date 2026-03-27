@@ -1,5 +1,6 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { LanguageProvider } from './contexts/LanguageContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Jobs from './pages/Jobs'
@@ -12,6 +13,7 @@ import Notifications from './pages/Notifications'
 
 export default function App() {
   return (
+    <ThemeProvider>
     <LanguageProvider>
       <BrowserRouter>
         <Layout>
@@ -28,5 +30,6 @@ export default function App() {
         </Layout>
       </BrowserRouter>
     </LanguageProvider>
+    </ThemeProvider>
   )
 }

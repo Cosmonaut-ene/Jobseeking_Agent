@@ -1,3 +1,90 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    --page-bg-start: #f1f5f9;
+    --page-bg-end:   #e2e8f0;
+    --card-bg:       rgba(255, 255, 255, 0.82);
+    --card-border:   rgba(148, 163, 184, 0.45);
+    --section-bg:    rgba(248, 250, 252, 0.70);
+    --input-bg:      rgba(255, 255, 255, 0.85);
+    --input-border:  #cbd5e1;
+    --input-text:    #0f172a;
+    --tag-bg:        #f1f5f9;
+    --tag-text:      #475569;
+    --divide:        rgba(226, 232, 240, 1);
+  }
+
+  .dark {
+    --page-bg-start: #09090b;
+    --page-bg-end:   #0f172a;
+    --card-bg:       rgba(24, 24, 27, 0.88);
+    --card-border:   rgba(255, 255, 255, 0.09);
+    --section-bg:    rgba(39, 39, 42, 0.70);
+    --input-bg:      rgba(39, 39, 42, 0.85);
+    --input-border:  #3f3f46;
+    --input-text:    #e2e8f0;
+    --tag-bg:        #3f3f46;
+    --tag-text:      #a1a1aa;
+    --divide:        rgba(63, 63, 70, 1);
+  }
+
+  body {
+    background: linear-gradient(135deg, var(--page-bg-start) 0%, var(--page-bg-end) 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  /* Glass card — automatically adapts to light/dark via CSS vars */
+  .glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    border-radius: 0.75rem;
+  }
+
+  /* Section header inside a card (e.g. table headers, panel tops) */
+  .glass-section {
+    background: var(--section-bg);
+  }
+
+  /* Input / select / textarea — unified dark-aware style */
+  .input-field {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--input-text);
+    border-radius: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    outline: none;
+    transition: box-shadow 0.15s, border-color 0.15s;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+  .input-field:focus {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.35);
+  }
+  .input-field::placeholder { color: var(--tag-text); }
+
+  /* Neutral tag (skill chips, required skills, etc.) */
+  .tag-neutral {
+    background: var(--tag-bg);
+    color: var(--tag-text);
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+  }
+
+  /* Table / list dividers */
+  .divide-theme > * + * {
+    border-top: 1px solid var(--divide);
+  }
+}

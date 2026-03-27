@@ -46,6 +46,7 @@ export default function Resume() {
   const [error, setError] = useState('')
   const [parsed, setParsed] = useState<UserProfile | null>(null)
   const [savedMsg, setSavedMsg] = useState('')
+  const [savedSuccess, setSavedSuccess] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function parse() {
@@ -118,9 +119,11 @@ export default function Resume() {
 
       await api.put('/api/profile', merged)
       setSavedMsg(t('resume_saved_msg'))
+      setSavedSuccess(true)
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Save failed'
       setSavedMsg(msg)
+      setSavedSuccess(false)
     } finally {
       setSaving(false)
     }
@@ -128,20 +131,20 @@ export default function Resume() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('resume_title')}</h1>
-      <p className="text-sm text-gray-500 mb-6">{t('resume_description')}</p>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('resume_title')}</h1>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{t('resume_description')}</p>
 
-      <div className="bg-white rounded-lg shadow">
+      <div className="glass-card overflow-hidden">
         {/* Tabs */}
-        <div className="flex border-b">
+        <div className="flex border-b border-slate-200/60 dark:border-zinc-700/60">
           {(['paste', 'upload'] as const).map((tabKey) => (
             <button
               key={tabKey}
               onClick={() => setTab(tabKey)}
               className={`px-6 py-3 text-sm font-medium transition-colors ${
                 tab === tabKey
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'border-b-2 border-amber-500 text-amber-600 dark:text-amber-400'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >
               {tabKey === 'paste' ? t('resume_tab_paste') : t('resume_tab_upload')}
@@ -156,16 +159,16 @@ export default function Resume() {
               onChange={(e) => setText(e.target.value)}
               rows={12}
               placeholder={t('resume_paste_placeholder')}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono resize-y"
+              className="w-full border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 font-mono resize-y"
             />
           ) : (
             <div
               onClick={() => fileRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-400 transition-colors"
+              className="border-2 border-dashed border-slate-200 dark:border-zinc-700 rounded-lg p-10 text-center cursor-pointer hover:border-amber-400 dark:hover:border-amber-500 transition-colors"
             >
-              <p className="text-gray-500 text-sm">
+              <p className="text-slate-500 dark:text-slate-400 text-sm">
                 {file ? (
-                  <span className="text-blue-600 font-medium">{file.name}</span>
+                  <span className="text-amber-600 dark:text-amber-400 font-medium">{file.name}</span>
                 ) : (
                   <>{t('resume_upload_hint')} <strong>PDF</strong>, <strong>DOCX</strong>, <strong>TXT</strong> {t('resume_upload_types')}</>
                 )}
@@ -184,50 +187,50 @@ export default function Resume() {
             <button
               onClick={parse}
               disabled={parsing}
-              className="px-5 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="px-5 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 disabled:opacity-50 transition-colors"
             >
               {parsing ? t('resume_parsing') : t('resume_parse_btn')}
             </button>
-            {parsing && <span className="text-sm text-gray-500">{t('resume_parsing_wait')}</span>}
+            {parsing && <span className="text-sm text-slate-500 dark:text-slate-400">{t('resume_parsing_wait')}</span>}
           </div>
 
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          {error && <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{error}</p>}
         </div>
       </div>
 
       {/* Parsed result */}
       {parsed && (
-        <div className="mt-6 bg-white rounded-lg shadow p-6 space-y-5">
+        <div className="mt-6 glass-card p-6 space-y-5">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">{t('resume_parsed_title')}</h2>
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200">{t('resume_parsed_title')}</h2>
             <button
               onClick={saveProfile}
               disabled={saving}
-              className="px-4 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               {saving ? t('resume_save_saving') : t('resume_save_btn')}
             </button>
           </div>
 
           {savedMsg && (
-            <div className={`text-sm px-3 py-2 rounded ${savedMsg.startsWith('✅') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
+            <div className={`text-sm px-3 py-2 rounded-lg ${savedSuccess ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300' : 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300'}`}>
               {savedMsg}
             </div>
           )}
 
           {/* Basic */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">{t('resume_basic_info')}</h3>
-            <p className="text-sm text-gray-800 font-medium">{parsed.name}</p>
-            <p className="text-sm text-gray-500">{t('resume_target_roles')} {parsed.target_roles?.join(', ') ?? '—'}</p>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">{t('resume_basic_info')}</h3>
+            <p className="text-sm text-slate-800 dark:text-slate-200 font-medium">{parsed.name}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{t('resume_target_roles')} {parsed.target_roles?.join(', ') ?? '—'}</p>
           </section>
 
           {/* Skills */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('resume_skills')} ({parsed.skills?.length ?? 0})</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{t('resume_skills')} ({parsed.skills?.length ?? 0})</h3>
             <div className="flex flex-wrap gap-1.5">
               {(parsed.skills ?? []).map((s) => (
-                <span key={s.name} className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded text-xs">
+                <span key={s.name} className="px-2 py-0.5 bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded text-xs">
                   {s.name} · {s.level} · {s.years}y
                 </span>
               ))}
@@ -236,17 +239,17 @@ export default function Resume() {
 
           {/* Experience */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('resume_experience')} ({parsed.experience?.length ?? 0})</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{t('resume_experience')} ({parsed.experience?.length ?? 0})</h3>
             <div className="space-y-2">
               {(parsed.experience ?? []).map((exp, i) => (
-                <div key={i} className="border-l-2 border-blue-200 pl-3">
-                  <p className="text-sm font-medium text-gray-800">{exp.role} @ {exp.company}</p>
-                  <p className="text-xs text-gray-500">{exp.duration}</p>
+                <div key={i} className="border-l-2 border-amber-200 dark:border-amber-700/60 pl-3">
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{exp.role} @ {exp.company}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{exp.duration}</p>
                   <ul className="mt-1 space-y-0.5">
                     {(exp.bullets ?? []).slice(0, 2).map((b, j) => (
-                      <li key={j} className="text-xs text-gray-600">• {b.raw}</li>
+                      <li key={j} className="text-xs text-slate-600 dark:text-slate-400">• {b.raw}</li>
                     ))}
-                    {(exp.bullets?.length ?? 0) > 2 && <li className="text-xs text-gray-400">+{(exp.bullets?.length ?? 0) - 2} more</li>}
+                    {(exp.bullets?.length ?? 0) > 2 && <li className="text-xs text-slate-400 dark:text-zinc-500">+{(exp.bullets?.length ?? 0) - 2} more</li>}
                   </ul>
                 </div>
               ))}
@@ -255,12 +258,12 @@ export default function Resume() {
 
           {/* Projects */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('resume_projects')} ({parsed.projects?.length ?? 0})</h3>
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{t('resume_projects')} ({parsed.projects?.length ?? 0})</h3>
             <div className="space-y-2">
               {(parsed.projects ?? []).map((p, i) => (
-                <div key={i} className="border-l-2 border-purple-200 pl-3">
-                  <p className="text-sm font-medium text-gray-800">{p.name}</p>
-                  <p className="text-xs text-gray-500">{p.tech_stack?.join(', ')}</p>
+                <div key={i} className="border-l-2 border-violet-200 dark:border-violet-700/60 pl-3">
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{p.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{p.tech_stack?.join(', ')}</p>
                 </div>
               ))}
             </div>
@@ -269,13 +272,13 @@ export default function Resume() {
           {/* Education */}
           {parsed.education && parsed.education.length > 0 && (
             <section>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">{t('resume_education')} ({parsed.education.length})</h3>
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">{t('resume_education')} ({parsed.education.length})</h3>
               <div className="space-y-2">
                 {parsed.education.map((edu, i) => (
-                  <div key={i} className="border-l-2 border-green-200 pl-3">
-                    <p className="text-sm font-medium text-gray-800">{edu.degree}{edu.field ? ` in ${edu.field}` : ''}</p>
-                    <p className="text-xs text-gray-600">{edu.institution}</p>
-                    <p className="text-xs text-gray-500">{edu.duration}{edu.gpa ? ` · GPA: ${edu.gpa}` : ''}</p>
+                  <div key={i} className="border-l-2 border-emerald-200 dark:border-emerald-700/60 pl-3">
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{edu.degree}{edu.field ? ` in ${edu.field}` : ''}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">{edu.institution}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{edu.duration}{edu.gpa ? ` · GPA: ${edu.gpa}` : ''}</p>
                   </div>
                 ))}
               </div>
@@ -284,16 +287,16 @@ export default function Resume() {
 
           {/* Preferences */}
           <section>
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">{t('profile_tab_preferences')}</h3>
-            <p className="text-sm text-gray-600">
+            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">{t('profile_tab_preferences')}</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               {t('resume_locations')} {parsed.preferences?.locations?.join(', ') || '—'}
             </p>
             {parsed.preferences?.salary_range && (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 {t('resume_salary')} {parsed.preferences.salary_range.min}–{parsed.preferences.salary_range.max} {parsed.preferences.salary_range.currency}
               </p>
             )}
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
               {t('resume_job_types')} {parsed.preferences?.job_types?.join(', ') || '—'}
             </p>
           </section>

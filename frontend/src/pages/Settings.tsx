@@ -82,23 +82,23 @@ export default function Settings() {
     }
   }
 
-  const inputCls = 'flex-1 border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+  const inputCls = 'flex-1 border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 text-slate-900 dark:text-slate-100 backdrop-blur-sm rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400'
 
   return (
     <div className="max-w-lg space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{t('settings_title')}</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{t('settings_title')}</h1>
 
       {/* Gemini API Key */}
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
+      <div className="glass-card p-6 space-y-4">
         <div>
-          <h2 className="text-base font-semibold text-gray-700 mb-1">{t('settings_gemini_title')}</h2>
-          <p className="text-sm text-gray-500 mb-3">
+          <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200 mb-1">{t('settings_gemini_title')}</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
             {t('settings_gemini_desc_pre')}{' '}
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
               rel="noreferrer"
-              className="text-blue-600 hover:underline"
+              className="text-amber-600 dark:text-amber-400 hover:underline"
             >
               Google AI Studio
             </a>
@@ -107,9 +107,11 @@ export default function Settings() {
 
           {/* Status */}
           <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm mb-4 ${
-            hasKey ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'
+            hasKey
+              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+              : 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
           }`}>
-            <span className={`w-2 h-2 rounded-full ${hasKey ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className={`w-2 h-2 rounded-full ${hasKey ? 'bg-emerald-500' : 'bg-rose-500'}`} />
             {hasKey ? `${t('settings_connected')} ${keyPreview}` : t('settings_not_configured')}
           </div>
 
@@ -125,28 +127,30 @@ export default function Settings() {
             <button
               onClick={save}
               disabled={saving || !keyInput.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition-colors"
             >
               {saving ? t('settings_saving') : t('settings_save')}
             </button>
           </div>
-          {msg && <p className="mt-2 text-sm text-green-600">{msg}</p>}
+          {msg && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{msg}</p>}
         </div>
 
-        <div className="border-t pt-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">{t('settings_production_title')}</h3>
-          <p className="text-sm text-gray-500">
-            {t('settings_production_desc_pre')} <code className="bg-gray-100 px-1 rounded">GEMINI_API_KEY</code> {t('settings_production_desc_post')}
+        <div className="border-t border-slate-200/60 dark:border-zinc-700/60 pt-4">
+          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t('settings_production_title')}</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {t('settings_production_desc_pre')}{' '}
+            <code className="bg-slate-100 dark:bg-zinc-800 px-1 rounded text-slate-700 dark:text-slate-300">GEMINI_API_KEY</code>
+            {' '}{t('settings_production_desc_post')}
           </p>
         </div>
       </div>
 
       {/* Notifications & Scheduler */}
-      <div className="bg-white rounded-lg shadow p-6 space-y-4">
-        <h2 className="text-base font-semibold text-gray-700">{t('settings_notif_title')}</h2>
+      <div className="glass-card p-6 space-y-4">
+        <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200">{t('settings_notif_title')}</h2>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings_webhook_label')}</label>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('settings_webhook_label')}</label>
           <input
             type="text"
             value={webhookUrl}
@@ -157,7 +161,7 @@ export default function Settings() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings_chat_id_label')}</label>
+          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('settings_chat_id_label')}</label>
           <input
             type="text"
             value={chatId}
@@ -169,7 +173,7 @@ export default function Settings() {
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings_high_threshold')}</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('settings_high_threshold')}</label>
             <input
               type="number"
               step="0.01"
@@ -179,10 +183,10 @@ export default function Settings() {
               onChange={(e) => setHighScoreThreshold(e.target.value)}
               className={inputCls + ' w-full'}
             />
-            <p className="text-xs text-gray-400 mt-1">{t('settings_threshold_hint_80')}</p>
+            <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">{t('settings_threshold_hint_80')}</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('settings_mid_threshold')}</label>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('settings_mid_threshold')}</label>
             <input
               type="number"
               step="0.01"
@@ -192,7 +196,7 @@ export default function Settings() {
               onChange={(e) => setMidScoreThreshold(e.target.value)}
               className={inputCls + ' w-full'}
             />
-            <p className="text-xs text-gray-400 mt-1">{t('settings_threshold_hint_70')}</p>
+            <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">{t('settings_threshold_hint_70')}</p>
           </div>
         </div>
 
@@ -203,35 +207,35 @@ export default function Settings() {
               id="scheduler-enabled"
               checked={schedulerEnabled}
               onChange={(e) => setSchedulerEnabled(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded"
+              className="w-4 h-4 accent-amber-500 rounded"
             />
-            <label htmlFor="scheduler-enabled" className="text-sm font-medium text-gray-700">
+            <label htmlFor="scheduler-enabled" className="text-sm font-medium text-slate-700 dark:text-slate-300">
               {t('settings_scheduler_enable')}
             </label>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-gray-700">{t('settings_scheduler_hour')}</label>
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('settings_scheduler_hour')}</label>
             <input
               type="number"
               min="0"
               max="23"
               value={schedulerHour}
               onChange={(e) => setSchedulerHour(e.target.value)}
-              className="w-16 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-16 border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
             />
-            <span className="text-sm text-gray-500">:00</span>
+            <span className="text-sm text-slate-500 dark:text-slate-400">:00</span>
           </div>
         </div>
 
-        <div className="border-t pt-4">
+        <div className="border-t border-slate-200/60 dark:border-zinc-700/60 pt-4">
           <button
             onClick={saveSettings}
             disabled={savingSettings}
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 transition-colors"
           >
             {savingSettings ? t('settings_saving') : t('settings_save_settings')}
           </button>
-          {settingsMsg && <p className="mt-2 text-sm text-green-600">{settingsMsg}</p>}
+          {settingsMsg && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{settingsMsg}</p>}
         </div>
       </div>
     </div>
