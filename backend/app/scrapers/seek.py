@@ -1,9 +1,15 @@
 """Seek.com.au 全自动爬虫."""
+import logging
 import random
 import re
 import time
-from playwright.sync_api import Page, sync_playwright
+
+from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError, sync_playwright
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
 from backend.app.scrapers import ScrapedJob
+
+logger = logging.getLogger(__name__)
 
 
 def _delay(min_s: float = 2.0, max_s: float = 6.0) -> None:
@@ -53,7 +59,7 @@ class SeekScraper:
                             results.append(job)
                             existing_urls.add(url)
                     except Exception as e:
-                        print(f"[Seek] Failed to fetch {url}: {e}")
+                        logger.warning("[Seek] Failed to fetch %s after retries: %s", url, e)
                     _delay(2.5, 6.0)
 
             browser.close()
@@ -88,7 +94,7 @@ class SeekScraper:
             page.goto(search_url, wait_until="domcontentloaded", timeout=30_000)
             _delay(1.5, 3.0)
         except Exception as e:
-            print(f"[Seek] Search page load failed for '{role}': {e}")
+            logger.warning("[Seek] Search page load failed for %r: %s", role, e)
             return []
 
         urls: list[str] = []
@@ -105,6 +111,12 @@ class SeekScraper:
 
         return urls
 
+    @retry(
+        retry=retry_if_exception_type(PlaywrightTimeoutError),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=1, min=3, max=10),
+        reraise=True,
+    )
     def _fetch_job(self, page: Page, url: str) -> ScrapedJob | None:
         page.goto(url, wait_until="domcontentloaded", timeout=30_000)
         _delay(1.0, 2.5)
