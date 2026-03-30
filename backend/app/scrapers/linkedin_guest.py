@@ -15,10 +15,31 @@ from urllib.parse import quote_plus
 
 import httpx
 from bs4 import BeautifulSoup
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from backend.app.scrapers import ScrapedJob
 
 logger = logging.getLogger(__name__)
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """429/5xx 和网络错误触发重试，404 等客户端错误不重试。"""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in {429, 500, 502, 503, 504}
+    return isinstance(exc, httpx.RequestError)
+
+
+@retry(
+    retry=retry_if_exception(_is_retryable),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=8),
+    reraise=True,
+)
+async def _get_with_retry(client: httpx.AsyncClient, url: str) -> httpx.Response:
+    """带指数退避重试的 GET 请求，最多 3 次。"""
+    resp = await client.get(url)
+    resp.raise_for_status()
+    return resp
 
 GUEST_SEARCH_API = (
     "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search"
@@ -46,10 +67,9 @@ async def _fetch_job_detail(
     """Call LinkedIn's public guest API and parse the returned HTML fragment."""
     api_url = GUEST_API.format(job_id=job_id)
     try:
-        resp = await client.get(api_url)
-        resp.raise_for_status()
+        resp = await _get_with_retry(client, api_url)
     except Exception as exc:
-        logger.warning("[LinkedIn] Guest API failed for job_id=%s: %s", job_id, exc)
+        logger.warning("[LinkedIn] Guest API failed for job_id=%s after retries: %s", job_id, exc)
         return None
 
     soup = BeautifulSoup(resp.text, "html.parser")
