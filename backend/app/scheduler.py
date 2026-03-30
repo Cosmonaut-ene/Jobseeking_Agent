@@ -18,6 +18,11 @@ def _daily_job() -> None:
         logger.info("[APScheduler] Daily scout done: %s", result)
     except Exception as e:
         logger.error("[APScheduler] Daily scout failed: %s", e)
+        try:
+            from backend.app.notifications import push_error_notification
+            push_error_notification(f"Daily scout failed: {e}")
+        except Exception:
+            pass  # 通知失败不能影响调度器本身
 
 
 def start_scheduler() -> None:

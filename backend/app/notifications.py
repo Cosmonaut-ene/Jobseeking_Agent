@@ -62,6 +62,17 @@ def push_high_score_job(job: Job) -> bool:
     return _send(text)
 
 
+def push_error_notification(message: str) -> bool:
+    """Push a system error alert to the configured webhook.
+
+    Called when a critical background task (e.g. daily scout) fails so the
+    user can be notified without having to tail logs.
+    Returns True if the push was sent successfully.
+    """
+    text = f"🚨 <b>系统告警</b>\n\n{message}"
+    return _send(text)
+
+
 def push_daily_summary(stats: dict, high_jobs: list[Job], mid_jobs: list[Job]) -> bool:
     """Daily summary push."""
     from datetime import date
