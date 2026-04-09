@@ -782,7 +782,7 @@ AI 顾问报告——技能差距分析。
 
 ### 8.5 可测试性
 
-- 后端测试套件：`backend/tests/` — **111 个测试通过**（`fix/engineering-quality` 修复前：9 个失败）
+- 后端测试套件：`backend/tests/` — **120 个测试，全部通过**
 - 测试命令：`PYTHONPATH=. python3 -m pytest backend/tests/ -v`
 - 覆盖范围：Agent、抓取器、路由、数据模型
 - 前端：v2.0 无自动化测试（手动测试）
