@@ -1,9 +1,12 @@
 """Seek.com.au 全自动爬虫."""
+import logging
 import random
 import re
 import time
 from playwright.sync_api import Page, sync_playwright
 from backend.app.scrapers import ScrapedJob
+
+logger = logging.getLogger(__name__)
 
 
 def _delay(min_s: float = 2.0, max_s: float = 6.0) -> None:
@@ -44,17 +47,17 @@ class SeekScraper:
             page = ctx.new_page()
 
             for role in target_roles:
-                location = locations[0] if locations else "All Australia"
-                job_urls = self._search(page, role, location, max_per_query, existing_urls)
-                for url in job_urls:
-                    try:
-                        job = self._fetch_job(page, url)
-                        if job:
-                            results.append(job)
-                            existing_urls.add(url)
-                    except Exception as e:
-                        print(f"[Seek] Failed to fetch {url}: {e}")
-                    _delay(2.5, 6.0)
+                for location in (locations if locations else ["All Australia"]):
+                    job_urls = self._search(page, role, location, max_per_query, existing_urls)
+                    for url in job_urls:
+                        try:
+                            job = self._fetch_job(page, url)
+                            if job:
+                                results.append(job)
+                                existing_urls.add(url)
+                        except Exception as e:
+                            logger.warning("[Seek] Failed to fetch %s: %s", url, e)
+                        _delay(2.5, 6.0)
 
             browser.close()
 
@@ -88,7 +91,7 @@ class SeekScraper:
             page.goto(search_url, wait_until="domcontentloaded", timeout=30_000)
             _delay(1.5, 3.0)
         except Exception as e:
-            print(f"[Seek] Search page load failed for '{role}': {e}")
+            logger.warning("[Seek] Search page load failed for '%s': %s", role, e)
             return []
 
         urls: list[str] = []

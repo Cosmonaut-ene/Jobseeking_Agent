@@ -1,5 +1,5 @@
 """Dashboard stats router."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter
 from sqlmodel import Session, func, select
 from backend.app.database import engine
@@ -28,7 +28,7 @@ def get_stats() -> dict:
         ).one()
 
         # Recent jobs (last 7 days)
-        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_ago = datetime.now(timezone.utc) - timedelta(days=7)
         recent = session.exec(
             select(func.count(Job.id)).where(Job.created_at >= week_ago)
         ).one()

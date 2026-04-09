@@ -50,11 +50,14 @@ function AtsBar({ pct }: { pct: number }) {
   const color = pct >= 70 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-400' : 'bg-rose-400'
   const textColor = pct >= 70 ? 'text-emerald-700 dark:text-emerald-400' : pct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 h-2.5 bg-slate-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+    <div className="space-y-1">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-2.5 bg-slate-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+        </div>
+        <span className={`text-sm font-bold ${textColor}`}>{pct}{t('eval_ats_match')}</span>
       </div>
-      <span className={`text-sm font-bold ${textColor}`}>{pct}{t('eval_ats_match')}</span>
+      <p className="text-xs text-slate-400 dark:text-zinc-500">{t('eval_ats_disclaimer')}</p>
     </div>
   )
 }

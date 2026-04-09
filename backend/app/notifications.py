@@ -7,6 +7,10 @@ from backend.app.models.job import Job
 
 logger = logging.getLogger(__name__)
 
+# Module-level constants — patchable by tests via monkeypatch.setattr
+NOTIFICATION_WEBHOOK_URL: str = os.environ.get("NOTIFICATION_WEBHOOK_URL", "")
+NOTIFICATION_CHAT_ID: str = os.environ.get("NOTIFICATION_CHAT_ID", "")
+
 
 def _strip_html(text: str) -> str:
     """Remove HTML tags for plain-text webhooks (e.g. Discord)."""
@@ -16,8 +20,8 @@ def _strip_html(text: str) -> str:
 
 def _send(text: str) -> bool:
     """Send a message via configured webhook. Returns True on success."""
-    webhook_url = os.environ.get("NOTIFICATION_WEBHOOK_URL", "")
-    chat_id = os.environ.get("NOTIFICATION_CHAT_ID", "")
+    webhook_url = NOTIFICATION_WEBHOOK_URL
+    chat_id = NOTIFICATION_CHAT_ID
     if not webhook_url:
         logger.info("[Notify] No webhook URL configured, skipping push.")
         return False

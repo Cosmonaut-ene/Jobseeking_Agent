@@ -782,10 +782,21 @@ AI 顾问报告——技能差距分析。
 
 ### 8.5 可测试性
 
-- 后端测试套件：`backend/tests/` — **120 个测试，128 个断言通过**（scout_agent 测试已随 `_evaluate` 重构同步更新）
+- 后端测试套件：`backend/tests/` — **111 个测试通过**（`fix/engineering-quality` 修复前：9 个失败）
 - 测试命令：`PYTHONPATH=. python3 -m pytest backend/tests/ -v`
 - 覆盖范围：Agent、抓取器、路由、数据模型
 - 前端：v2.0 无自动化测试（手动测试）
+
+### 8.6 ATS 评分说明（重要限制）
+
+`match_score`（= `ats_pct / 100`）是由 **Gemini LLM 估算**的关键词匹配百分比，**不是**真实 ATS 系统的解析结果。
+
+已知局限性：
+- LLM 倾向于给出偏高分数（flattery bias）
+- 真实 ATS 系统的解析逻辑（字体、格式、关键词位置权重）无法模拟
+- 分数仅供**排序参考**，不代表实际投递通过率
+
+UI 显示要求：所有展示 `match_score` 的界面必须附带说明文字"AI 估算，仅供参考"。
 
 ---
 
@@ -830,6 +841,20 @@ AI 顾问报告——技能差距分析。
 | 功能                        | 优先级 | 状态    | 备注                                                                                                                                                                                                          |
 | --------------------------- | ------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Tailor Agent ATS 关键词注入 | P1     | ✅ 完成 | 松绑 STRICT RULE 1：允许织入 JD 术语；新增 Rule 6；Prompt 增加 `## Target ATS Keywords` 和 `## Quantification Opportunities` 两节，数据来自 `gap_analysis.resume_improvements`（Scout 已产出，v2.3 前未使用） |
+
+### v2.3 — 工程质量修复（`fix/engineering-quality`）
+
+| Task | 内容 | 优先级 | 状态 |
+| ---- | ---- | ------ | ---- |
+| EQ-01 | `notifications.py` 新增模块级常量 `NOTIFICATION_WEBHOOK_URL` / `NOTIFICATION_CHAT_ID`，`_send()` 使用模块级变量而非每次读 `os.environ` | P0 | ✅ 完成 |
+| EQ-02 | `backend/tests/conftest.py` 新增 `mock_load_dotenv` fixture，防止 `config.py` reload 时重读 `.env` 干扰测试 | P0 | ✅ 完成 |
+| EQ-03 | `models/job.py` + `routers/dashboard.py`：`datetime.utcnow()` → `datetime.now(timezone.utc)` | P1 | ✅ 完成 |
+| EQ-04 | `scrapers/seek.py`：`print()` → `logger.warning()` | P1 | ✅ 完成 |
+| EQ-05 | `scrapers/scheduler.py`：Seek 抓取遍历所有 locations，而非仅 `locations[0]` | P1 | ✅ 完成 |
+| EQ-06 | `src/` 目录新增 `DEPRECATED.md`，标注已被 `backend/` 取代 | P1 | ✅ 完成 |
+| EQ-07 | 前端 ATS 评分展示处加"AI 估算，仅供参考"说明（对应 8.6 节要求） | P1 | ✅ 完成 |
+
+**验收标准**：`PYTHONPATH=. python3 -m pytest backend/tests/ -v` 全部通过，无 `DeprecationWarning`。
 
 ### v2.3 — 中期规划
 

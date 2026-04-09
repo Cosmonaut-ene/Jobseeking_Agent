@@ -269,6 +269,7 @@ export const translations = {
     eval_deeper: 'Deeper Improvements (1–4 weeks)',
     eval_rec_resout: 'Re-scout this job to see prioritised recommendations.',
     eval_ats_match: '% ATS match',
+    eval_ats_disclaimer: 'AI-estimated score — not a real ATS system result. For reference only.',
   },
   zh: {
     // Layout
@@ -538,6 +539,7 @@ export const translations = {
     eval_deeper: '深度优化（1–4 周）',
     eval_rec_resout: '重新分析此职位以查看优先建议。',
     eval_ats_match: '% ATS 匹配',
+    eval_ats_disclaimer: 'AI 估算分数，非真实 ATS 系统结果，仅供参考。',
   },
 } as const
 
