@@ -1758,7 +1758,7 @@ Faker 虚拟数据生成脚本（一次性 / 可重跑）
   - `discovery-trend` 的 SQL 必须包含 `OVER (ORDER BY ... ROWS BETWEEN)`；`skill-gaps` 必须包含 `json_each`
   - 新增 pytest：至少覆盖 1 个端点 happy path + `analytics_demo.db` 缺失时的错误路径
 
-#### TASK-D03：前端 Analytics 页面
+#### TASK-D03：前端 Analytics 页面 ✅ 完成（分支 `feat/analytics/demo-data-generator`）
 
 - **输入**：TASK-D02 的 6 个接口契约
 - **输出**：`frontend/src/pages/Analytics.tsx`（6 个区块对应 6 个接口）；`App.tsx` 注册 `/analytics`；`Layout.tsx` NAV_ITEMS 新增入口；`i18n/translations.ts` 补充 en/zh 文案
