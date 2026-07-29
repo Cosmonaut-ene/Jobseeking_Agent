@@ -1738,7 +1738,7 @@ Faker 虚拟数据生成脚本（一次性 / 可重跑）
   - `python scripts/generate_analytics_demo_data.py` 跑完后四张表均有数据，量级符合上述规模
   - 生产库 `data/db/jobseeking.db` 内容不受任何影响
 
-#### TASK-D02：后端 Analytics Router（原生 SQL）
+#### TASK-D02：后端 Analytics Router（原生 SQL） ✅ 完成（分支 `feat/analytics/demo-data-generator`）
 
 - **输入**：TASK-D01 产出的 `data/analytics_demo.db`
 - **输出**：新建 `backend/app/analytics_db.py`（独立 engine，指向 `analytics_demo.db`）+ `backend/app/routers/analytics.py`（6 个 GET 端点）+ `main.py` 注册路由：
