@@ -1770,7 +1770,7 @@ Faker 虚拟数据生成脚本（一次性 / 可重跑）
   - 6 个模块均有加载态和空态（`analytics_demo.db` 未生成时提示先跑 TASK-D01）
   - `npx tsc --noEmit` 通过
 
-#### TASK-D04：ETL 脚本 → Snowflake 星型模型
+#### TASK-D04：ETL 脚本 → Snowflake 星型模型 ✅ 完成（分支 `feat/analytics/demo-data-generator`，验证记录见 `docs/snowflake_verification/`）
 
 - **输入**：`data/analytics_demo.db`；Snowflake 试用账号凭证（人工注册，30 天窗口从注册起计时）
 - **输出**：`scripts/etl_to_snowflake.py`；Snowflake 侧建表：`dim_date` / `dim_company`（含 industry）/ `dim_job` / `fact_application`（含从状态变更记录算出的 `days_to_first_response`）
