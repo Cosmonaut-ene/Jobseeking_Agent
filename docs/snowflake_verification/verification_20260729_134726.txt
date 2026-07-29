@@ -1,0 +1,24 @@
+Verification query: avg match_score / days_to_first_response by industry
+
+SELECT
+    c.industry,
+    COUNT(*) AS applications,
+    ROUND(AVG(f.match_score), 2) AS avg_match_score,
+    ROUND(AVG(f.days_to_first_response), 1) AS avg_days_to_first_response
+FROM fact_application f
+JOIN dim_company c ON c.company_key = f.company_key
+GROUP BY c.industry
+ORDER BY applications DESC
+
+
+('INDUSTRY', 'APPLICATIONS', 'AVG_MATCH_SCORE', 'AVG_DAYS_TO_FIRST_RESPONSE')
+('Retail', 57, 0.6, Decimal('5.6'))
+('Finance', 50, 0.62, Decimal('5.9'))
+('Media', 40, 0.66, Decimal('4.9'))
+('Government', 34, 0.56, Decimal('6.0'))
+('Healthcare', 34, 0.64, Decimal('6.0'))
+('Hospitality', 30, 0.64, Decimal('5.2'))
+('Logistics', 28, 0.62, Decimal('5.5'))
+('Education', 27, 0.62, Decimal('4.6'))
+('Manufacturing', 26, 0.62, Decimal('5.1'))
+('Technology', 22, 0.73, Decimal('5.7'))
