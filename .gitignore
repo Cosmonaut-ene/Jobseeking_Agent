@@ -1,6 +1,7 @@
 .venv/
 .env
 data/db/
+data/analytics_demo.db
 data/user_profile.json
 *.pdf
 __pycache__/
