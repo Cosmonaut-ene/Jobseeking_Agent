@@ -1720,7 +1720,7 @@ Faker 虚拟数据生成脚本（一次性 / 可重跑）
 
 > Task 粒度 = commit 粒度。开发顺序：D01 → D02/D03（可并行）→ D04 → D05。D04 涉及 Snowflake 真实账号的 30 天试用窗口，**必须等 D01–D03 完全稳定后再开通账号启动**，避免窗口期浪费在前置阶段的调试上。
 
-#### TASK-D01：虚拟数据生成脚本
+#### TASK-D01：虚拟数据生成脚本 ✅ 完成（分支 `feat/analytics/demo-data-generator`）
 
 - **输入**：无外部输入，脚本内用常量定义规模（建议 ≥5 个行业、200+ 家虚拟公司、800+ 条虚拟 Job、300+ 条虚拟 Application，每条 Application 2-4 条状态变更记录）
 - **输出**：新建 `scripts/generate_analytics_demo_data.py`；运行后在独立文件 `data/analytics_demo.db` 生成 4 张表（纯 SQL DDL，**不使用 SQLModel**——两套 SQLModel 元数据在同一进程会冲突，见 DECISIONS.md DEC-01）：
