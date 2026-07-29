@@ -10,6 +10,7 @@ import Scout from './pages/Scout'
 import Scrapers from './pages/Scrapers'
 import Settings from './pages/Settings'
 import Notifications from './pages/Notifications'
+import Analytics from './pages/Analytics'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
             <Route path="/scout" element={<Scout />} />
             <Route path="/scrapers" element={<Scrapers />} />
             <Route path="/jobs" element={<Jobs />} />
+            <Route path="/analytics" element={<Analytics />} />
             <Route path="/resume" element={<Resume />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/notifications" element={<Notifications />} />

@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Briefcase, Globe, Bell,
-  User, FileText, Settings, Sun, Moon,
+  User, FileText, Settings, Sun, Moon, BarChart3,
 } from 'lucide-react'
 import { useLang, useT } from '../contexts/LanguageContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -10,6 +10,7 @@ import type { TranslationKey } from '../i18n/translations'
 const NAV_ITEMS: { to: string; key: TranslationKey; Icon: React.ElementType }[] = [
   { to: '/',              key: 'nav_dashboard',     Icon: LayoutDashboard },
   { to: '/jobs',          key: 'nav_jobs',           Icon: Briefcase       },
+  { to: '/analytics',     key: 'nav_analytics',      Icon: BarChart3       },
   { to: '/scrapers',      key: 'nav_scrapers',       Icon: Globe           },
   { to: '/notifications', key: 'nav_notifications',  Icon: Bell            },
   { to: '/profile',       key: 'nav_profile',        Icon: User            },
