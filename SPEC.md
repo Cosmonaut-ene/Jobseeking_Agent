@@ -860,6 +860,8 @@ UI 显示要求：所有展示 `match_score` 的界面必须附带说明文字"A
 
 | 功能             | 优先级 | 备注                                   |
 | ---------------- | ------ | -------------------------------------- |
+| PDF 生成引擎改用 Playwright | P2 | 修复现有导出格式变形问题：`weasyprint`/`jinja2` 从未声明进 `requirements.txt`/`uv.lock`；WeasyPrint 是自实现的 CSS 引擎，flexbox/中文字体回退支持不完整（模板当前用 `font-family: Arial`，无中文字形）。方案：复用项目已有的 `playwright` 依赖（Seek 爬虫已用），`page.pdf(format="A4", print_background=True)` 直接渲染 `templates/resume.html`，与真实浏览器预览一致，不会有引擎间不一致导致的变形。范围仅限修复现有单模板渲染质量，**不做 FlowCV 式的多模板/用户自定义模板**；DOCX 导出本次不动。需同步更新附录 C（当前记录的是 WeasyPrint 方案）及 `pdf_generator.py`。非紧急，暂缓 |
+| 求职数据分析仪表盘（Analytics + DW + Tableau） | P2 | 面向求职（Data Engineer 方向）作品集展示。项目内新增 raw SQL 分析页 + Snowflake 星型模型 + Tableau Public 公开仪表盘。详细方案见**附录 E**。非紧急，暂缓 |
 | 邮件集成         | P2     | 通过 SMTP 从应用直接发送求职信         |
 | 面试准备         | P3     | LLM 生成职位专属面试问题+答案          |
 | 公司调研         | P3     | 自动从 LinkedIn/Glassdoor 获取公司信息 |
@@ -1628,3 +1630,169 @@ Backend-PDF Agent已完成，接口契约为：GET /api/files/{job_id}/resume.pd
 Backend Agent已完成实现。你的任务是编写测试并执行全量回归验收。
 最终结果必须：总测试数 ≥ 116，全部通过，0个失败。
 ```
+
+---
+
+## 附录 E：求职数据分析仪表盘方案（Analytics + Data Warehouse + Tableau）
+
+**状态**：🔲 待开发（规划阶段，讨论于 2026-07-29，尚未破土）
+**目的**：为求职（Data Engineer 方向）作品集提供可展示的 SQL / 数据建模 / 云数据仓库 / BI 可视化能力证据，与 Jobseeking_Agent 现有的爬虫/API/AI Agent 能力共同构成一个完整的端到端个人项目叙事，而非另起一个孤立的 Kaggle 玩具项目。
+
+### E.1 背景
+
+用户计划开发一个数据分析仪表盘，用于面试/作品集展示 SQL 实战能力，并进一步扩展到 Snowflake 星型模型数据仓库 + Tableau Public 公开可视化（投递转化率、行业分布、响应时间趋势）。讨论过程中确认：
+
+- 真实个人求职数据量小（几十条 Job 记录），且 Tableau Public 是**真公开**服务（任何人可下载底层数据），直接发布真实数据（公司名、投递状态等）有隐私风险。
+- 现有 `Job`/`Application` 表缺少两块数据：行业分类字段、真实的状态变更时间线（`Application.status` 目前是从未被更新过的死字段，见 `ARCHITECTURE_REVIEW.md` §5 第 6 条）。
+- 最终决定：**整条分析链路（含项目内页面）改用 Faker 生成的虚拟数据**，不使用真实求职记录，从根源解决隐私问题，同时可以自由造出行业分布、状态时间线等目前真实数据里没有的维度。
+
+### E.2 被拒绝的方案
+
+以下是讨论中明确排除的方案，后续开发不应重新引入，除非有新理由：
+
+- **发布真实个人求职数据到 Tableau Public**：隐私风险不可接受（公司名、投递明细任何人可下载）。
+- **只用 DuckDB、不碰 Snowflake**：DuckDB 零运维更省事，但用户看到的多个 Data Engineer JD 都点名 Snowflake，放弃会失去一个具体的简历/面试谈资。
+- **Snowflake + DuckDB 双实现（同一套 DDL 适配两种方言）**：作为"设计了引擎无关的维度模型"的加分项被讨论过，但增加了额外工作量，用户选择了"只用 Snowflake，接受 30 天试用窗口"的精简版本。
+- **另起一个基于 Kaggle 数据集的独立 Data Engineer 作品集项目**：讨论后判定叙事上不如现有项目——Jobseeking_Agent 已有真实的爬虫/API/AI Agent 集成，能覆盖目标 JD 中"APIs、云服务、数据摄取"等要求；Kaggle 热门数据集做星型模型是招聘方见过无数次的模板化项目，辨识度低。且该 JD 明确要求"熟练使用 LLM coding assistant 做 pipeline 开发/调试/文档"，本项目本身的 SPEC 驱动 + Claude Code 协作开发流程就是直接证据。
+- **给生产用的 `Job` 表新增 `industry` 字段并用 LLM 对真实岗位批量回填**：在"改用虚拟数据"之前讨论过，因为要修改生产 schema、成本较高而被否决；改用虚拟数据后，行业标签可以在数据生成脚本里直接合成，不再需要碰生产表，因此行业分布指标被重新纳入范围。
+
+### E.3 架构
+
+```
+Faker 虚拟数据生成脚本（一次性 / 可重跑）
+   ↓ 生成 Job / Application / Company / 状态变更历史 等 OLTP 形状的数据
+   ↓ 写入独立的 data/analytics_demo.db（不写入生产用的 data/db/jobseeking.db，不污染真实求职数据）
+   │
+   ├──→ 项目内 /analytics 页面（frontend + 新 router）
+   │      原生 SQL（session.exec(text(...))）查询 data/analytics_demo.db
+   │      覆盖 JOIN / GROUP BY / CTE / 窗口函数 / JSON 提取 等技巧
+   │
+   └──→ ETL 脚本（scripts/ 或 backend/app/analytics/ 下新目录）
+          读取 data/analytics_demo.db → 转换为星型模型 → 加载进 Snowflake
+                 ↓（30 天试用窗口内完成建模、查询验证、截图/文档存证）
+          Snowflake（fact_application + dim_job / dim_company / dim_date）
+                 ↓ 发布 Tableau **extract**（数据快照，不做实时连接）
+          Tableau Public 仪表盘：投递转化率 / 行业分布 / 响应时间趋势
+```
+
+### E.4 范围边界
+
+**包含**：
+- 虚拟数据生成脚本，独立数据库文件，不接触生产 `Job`/`Application`/`ResumeVersion` 表
+- 项目内新页面：`backend/app/routers/analytics.py`（原生 SQL）+ `frontend/src/pages/Analytics.tsx` + 侧边栏导航入口
+- ETL 脚本：`data/analytics_demo.db` → Snowflake 星型模型（fact_application + 至少 dim_job / dim_company / dim_date）
+- Tableau Public 仪表盘：投递转化率、行业分布、响应时间趋势（均基于虚拟数据）
+- 仪表盘页面与仓库 README 中明确标注"合成数据集，用于技术能力演示"
+
+**不包含**：
+- 不修改生产用 `Job`/`Application` 表结构（不加 `industry` 字段、不加状态历史表到生产 schema）
+- 不做 Snowflake 长期在线维护（试用期 30 天，到期后账号挂起属预期内，不做续费/迁移付费账号的安排）
+- 不做 Tableau 与 Snowflake 的实时连接（只发布 extract 快照）
+- 不做多用户/多数据集支持
+
+### E.5 分析模块（沿用此前确认的 6 个 + 行业分布）
+
+| 模块 | 承载位置 | 用到的技巧 |
+|---|---|---|
+| 来源 × 状态转化矩阵 | 项目内页面 | `GROUP BY` + 条件聚合 |
+| 技能缺口 Top N | 项目内页面 | `json_each()` JSON 行转列 |
+| 匹配分数分布直方图 | 项目内页面 | `CASE`/`CAST` 分桶聚合 |
+| 岗位发现趋势 + 7 日移动平均 | 项目内页面 | 窗口函数（`ROWS BETWEEN`） |
+| Tailor/投递转化率 | 项目内页面 + Tableau | 多表 `JOIN` + CTE |
+| 高频出现公司 Top N | 项目内页面 | `GROUP BY` + `ORDER BY COUNT(*)` |
+| 行业分布 | Tableau（虚拟数据合成的 `industry` 字段） | Snowflake 维度建模 |
+| 响应时间趋势 | Tableau（虚拟数据合成的状态变更时间线） | 星型模型 + 日期维度 |
+
+### E.6 关键约束与风险
+
+- **Snowflake 30 天试用窗口**：无信用卡即可开通，30 天或 $400 额度先到先算；到期后账号挂起（不能查询），10 天后数据删除，除非转付费。因此必须在窗口内完成"建模 → 查询验证 → 截图/文档存证 → 发布 Tableau extract"全部动作，不能设计成长期在线依赖 Snowflake 的架构。
+- **数据标注义务**：仪表盘和 README 必须清楚说明数据是合成的，不得暗示是真实求职战绩，这是诚信底线，不是可选项。
+- **SQLite 方言限制**：项目内分析页用 SQLite（`json_each`、窗口函数均支持，但无 Postgres 专属函数如 `json_agg`）；ETL 到 Snowflake 时注意方言差异。
+
+### E.7 开发时序建议（进入开发阶段时再拆细 Task）
+
+1. 虚拟数据生成脚本 + 独立 `analytics_demo.db`
+2. 项目内 `/analytics` 页面（原生 SQL，6+1 个模块）
+3. ETL 脚本 + Snowflake 星型模型（需在 30 天窗口内一次性完成到发布 extract）
+4. Tableau Public 发布 + README/页面数据来源标注
+
+### E.8 Task 拆分（开发阶段，2026-07-29 拆分）
+
+> Task 粒度 = commit 粒度。开发顺序：D01 → D02/D03（可并行）→ D04 → D05。D04 涉及 Snowflake 真实账号的 30 天试用窗口，**必须等 D01–D03 完全稳定后再开通账号启动**，避免窗口期浪费在前置阶段的调试上。
+
+#### TASK-D01：虚拟数据生成脚本
+
+- **输入**：无外部输入，脚本内用常量定义规模（建议 ≥5 个行业、200+ 家虚拟公司、800+ 条虚拟 Job、300+ 条虚拟 Application，每条 Application 2-4 条状态变更记录）
+- **输出**：新建 `scripts/generate_analytics_demo_data.py`；运行后在独立文件 `data/analytics_demo.db` 生成 4 张表（纯 SQL DDL，**不使用 SQLModel**——两套 SQLModel 元数据在同一进程会冲突，见 DECISIONS.md DEC-01）：
+  - `demo_company(id, name, industry)`
+  - `demo_job(id, source, title, company_id, location, salary_min, salary_max, match_score, gap_analysis_json, status, created_at)`
+  - `demo_application(id, job_id, channel, applied_at)`
+  - `demo_application_status_log(id, application_id, status, changed_at)`
+- **新增依赖**：`faker`
+- **约束 / 不得做**：
+  - 不得读写生产库 `data/db/jobseeking.db`，两者物理隔离
+  - `gap_analysis_json` 结构必须与真实 `Job.gap_analysis` 的 key（`missing_skills`/`strong_matches` 等）一致，保证 D02 的 `json_each` 查询逻辑可原样套用到真实数据
+  - 脚本必须可重复运行（先 `DROP TABLE IF EXISTS` 再重建），不得追加导致重复数据
+  - 数据分布需有真实感：覆盖多行业、三种 source（seek/linkedin/manual）、完整的 status 生命周期（不能全是 `new`）
+- **AC**：
+  - `python scripts/generate_analytics_demo_data.py` 跑完后四张表均有数据，量级符合上述规模
+  - 生产库 `data/db/jobseeking.db` 内容不受任何影响
+
+#### TASK-D02：后端 Analytics Router（原生 SQL）
+
+- **输入**：TASK-D01 产出的 `data/analytics_demo.db`
+- **输出**：新建 `backend/app/analytics_db.py`（独立 engine，指向 `analytics_demo.db`）+ `backend/app/routers/analytics.py`（6 个 GET 端点）+ `main.py` 注册路由：
+  - `GET /api/analytics/funnel` — 来源 × 状态转化矩阵
+  - `GET /api/analytics/skill-gaps` — 技能缺口 Top N（`json_each`）
+  - `GET /api/analytics/score-distribution` — 匹配分数分布直方图
+  - `GET /api/analytics/discovery-trend` — 岗位发现趋势 + 7 日移动平均（窗口函数）
+  - `GET /api/analytics/conversion` — Tailor/投递转化率（JOIN + CTE）
+  - `GET /api/analytics/top-companies` — 高频公司 Top N
+- **约束 / 不得做**：
+  - 一律 `session.exec(text(...))` 原生 SQL，**不用 SQLModel `select()`/ORM 查询构造器**（本功能的核心目的就是展示 SQL，不能藏在 ORM 后面）
+  - 不得复用生产 `database.py` 的 `engine`
+  - 只读，不得出现任何 INSERT/UPDATE/DELETE
+  - `analytics_demo.db` 不存在时返回明确的 4xx 提示，不得 500 崩溃
+- **AC**：
+  - 6 个端点均可通过 `curl` 正常返回 JSON
+  - `discovery-trend` 的 SQL 必须包含 `OVER (ORDER BY ... ROWS BETWEEN)`；`skill-gaps` 必须包含 `json_each`
+  - 新增 pytest：至少覆盖 1 个端点 happy path + `analytics_demo.db` 缺失时的错误路径
+
+#### TASK-D03：前端 Analytics 页面
+
+- **输入**：TASK-D02 的 6 个接口契约
+- **输出**：`frontend/src/pages/Analytics.tsx`（6 个区块对应 6 个接口）；`App.tsx` 注册 `/analytics`；`Layout.tsx` NAV_ITEMS 新增入口；`i18n/translations.ts` 补充 en/zh 文案
+- **约束 / 不得做**：
+  - 沿用现有页面风格（`glass-card`、`useT()`、深色模式变量），不引入新 UI 库
+  - 必须挂在侧边栏可达（不得重蹈 `Scout.tsx` 无导航入口的覆辙）
+- **AC**：
+  - `/analytics` 从侧边栏可达
+  - 6 个模块均有加载态和空态（`analytics_demo.db` 未生成时提示先跑 TASK-D01）
+  - `npx tsc --noEmit` 通过
+
+#### TASK-D04：ETL 脚本 → Snowflake 星型模型
+
+- **输入**：`data/analytics_demo.db`；Snowflake 试用账号凭证（人工注册，30 天窗口从注册起计时）
+- **输出**：`scripts/etl_to_snowflake.py`；Snowflake 侧建表：`dim_date` / `dim_company`（含 industry）/ `dim_job` / `fact_application`（含从状态变更记录算出的 `days_to_first_response`）
+- **新增依赖**：`snowflake-connector-python`
+- **约束 / 不得做**：
+  - 凭证只能来自环境变量（新增 `SNOWFLAKE_ACCOUNT`/`SNOWFLAKE_USER`/`SNOWFLAKE_PASSWORD`/`SNOWFLAKE_WAREHOUSE`/`SNOWFLAKE_DATABASE`，写入 `.env.example` 但不写真实值），不得硬编码或提交到 git
+  - 不引入 `pandas`；用标准库 `sqlite3` 读 + connector 的 `cursor.executemany` 写，控制依赖体积
+  - **必须等 D01–D03 稳定后再开通 Snowflake 账号启动本 Task**，避免 30 天窗口浪费
+- **AC**：
+  - Snowflake 内 4 张表行数与源库一致
+  - 人工在 Snowflake Web UI 跑 1-2 条验证查询（如按 industry 分组求平均 match_score）并截图存档到 `docs/snowflake_verification/`
+
+#### TASK-D05：Tableau Public 发布 + 数据来源标注
+
+- **输入**：TASK-D04 产出的 Snowflake 星型模型
+- **输出**：`scripts/export_for_tableau.py`（导出 Tableau Public 可直接读取的文件）；README 新增"数据来源说明"；Analytics 页面加"合成数据集"标注
+- **约束 / 不得做**：
+  - Tableau Public Desktop 的建图/发布是 GUI 操作，不可自动化，本 Task 只交付导出脚本 + 人工 checklist
+  - 不得用实时连接（Snowflake 30 天后不可用），必须是静态导出文件 / extract
+- **AC**：
+  - 导出文件能被 Tableau Public Desktop 正常读取（人工验证）
+  - 发布的 Tableau Public 链接、README、Analytics 页面三处均清楚标注"合成数据集"
+  - 投递转化率 / 行业分布 / 响应时间趋势三个目标图表在 Tableau Public 上可见
+
+_本附录为规划记录，非实现文档。进入开发前需按 CLAUDE.md 流程重新走一遍 Interpretation Confirmation，并将各阶段拆成自包含的 TASK-XX（输入/输出/约束/禁止事项/AC）。_
