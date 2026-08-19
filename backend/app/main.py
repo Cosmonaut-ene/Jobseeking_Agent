@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.app.database import init_db
 from backend.app.scheduler import start_scheduler, stop_scheduler
-from backend.app.routers import jobs, profile, settings, notifications, scrapers, dashboard, files, analytics
+from backend.app.routers import jobs, profile, settings, notifications, scrapers, dashboard, files, ats, analytics
 
 
 @asynccontextmanager
@@ -56,6 +56,7 @@ app.include_router(notifications.router, prefix="/api")
 app.include_router(scrapers.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(files.router, prefix="/api")
+app.include_router(ats.router, prefix="/api")
 app.include_router(analytics.router, prefix="/api")
 
 # Serve React build
