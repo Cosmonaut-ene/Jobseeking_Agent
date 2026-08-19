@@ -55,6 +55,7 @@ export interface Job {
   created_at: string
   updated_at: string
   resume_versions?: ResumeVersion[]
+  application?: Application | null
 }
 
 export interface ResumeVersion {
@@ -96,16 +97,35 @@ export async function simulateAts(resumeVersionId: string): Promise<AtsSimulatio
   return r.data
 }
 
+// ready(AI 已备好) -> applied(人类已投递) -> responded/interview/rejected
+// 见 SPEC 附录 F.6 TASK-D01；流转规则由后端 APPLICATION_STATUS_TRANSITIONS 强制。
+export type ApplicationStatus = 'ready' | 'applied' | 'responded' | 'interview' | 'rejected'
+
 export interface Application {
   id: string
   job_id: string
   resume_version_id: string
   channel: string
-  status: string
+  status: ApplicationStatus
   applied_at: string
   follow_up_date: string | null
   notes: string
   cover_letter_path?: string | null
+}
+
+export interface ReadyToConfirmEntry {
+  application: Application
+  job: Job | null
+}
+
+export async function listReadyToConfirm(): Promise<ReadyToConfirmEntry[]> {
+  const r = await api.get('/api/dashboard/ready-to-confirm')
+  return r.data
+}
+
+export async function confirmApplicationApplied(applicationId: string): Promise<Application> {
+  const r = await api.put(`/api/applications/${applicationId}/status`, { status: 'applied' })
+  return r.data
 }
 
 export interface Skill {

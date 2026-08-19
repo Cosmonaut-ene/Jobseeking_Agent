@@ -55,8 +55,15 @@ def get_job(job_id: str) -> dict:
             .where(ResumeVersion.job_id == job_id)
             .order_by(ResumeVersion.created_at.desc())
         ).all()
+        # SPEC 附录 F.6 TASK-D02: 供 Jobs 页面判断"是否需要显示确认已投递按钮"
+        application = session.exec(
+            select(Application)
+            .where(Application.job_id == job_id)
+            .order_by(Application.applied_at.desc())
+        ).first()
     result = jsonable_encoder(job)
     result["resume_versions"] = jsonable_encoder(versions)
+    result["application"] = jsonable_encoder(application) if application else None
     return result
 
 
