@@ -51,3 +51,21 @@
 **决策**：`scheduler.py` 的 except 块中用局部 import 引入 `push_error_notification`，而非顶层 import。
 
 **原因**：防止 scheduler ↔ notifications 之间的循环依赖风险；同时将通知相关代码的加载推迟到真正需要时。
+
+---
+
+## 2026-08-19 — v3.0 升级 session
+
+### DEC-05: 投递确认放弃"消息内一键操作"，改为推送提醒 + App 内确认
+
+**决策**：SPEC 附录 F.6 TASK-D02 原方案是"推送消息里放一键确认按钮/链接，零摩擦、不用回 App"。改为推送只做提醒（纯文案，不含任何可执行操作），确认动作固定在 App 内针对具体 Job 完成。
+
+**原因**：
+- 实测发现用户实际配置的通知 webhook 是纯 Discord webhook（`NOTIFICATION_WEBHOOK_URL` 含 `discord.com`，无 `NOTIFICATION_CHAT_ID`）。Discord 的交互按钮需要注册完整 Discord Application（slash commands + interaction endpoint + Ed25519 签名验证），普通 webhook 做不到。
+- 退一步的方案（消息里放 magic link，点了直接调后端接口）对当前 Web 服务架构可行，但与附录 F.5 模块 A（本地桌面化，无公网暴露面）直接冲突——手机上刷到推送、点链接，够不着笔记本上跑的 `localhost` 服务。除非做内网穿透，但那会抵消桌面化本来想要的安全收益（消除公网暴露面）。
+- 用户直接拍板：接受"确认需要回 App"这个摩擦成本，换取方案在当前架构和未来桌面化架构下都成立，不需要模块 A 落地后重做。
+
+**被拒绝的方案**：
+- Telegram 风格 inline keyboard：技术上可行但用户用的是 Discord，不适用；且引入"按 webhook 类型分叉不同确认机制"的复杂度，不划算
+- Magic link 免登录确认：见上，与模块 A 冲突
+- 完整 Discord Bot Application（slash commands + interaction endpoint）：工作量与收益不成比例，且需要一个公网可达的 interaction endpoint，同样与桌面化方向冲突
