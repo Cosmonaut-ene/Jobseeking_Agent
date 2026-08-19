@@ -140,21 +140,31 @@ class ResumeParser:
 
     def parse_file(self, file_path: Path) -> dict:
         """Parse a PDF or DOCX resume file."""
-        suffix = file_path.suffix.lower()
-        if suffix == ".pdf":
-            text = self._extract_pdf(file_path)
-        elif suffix in (".docx", ".doc"):
-            text = self._extract_docx(file_path)
-        else:
-            text = file_path.read_text(encoding="utf-8")
-        return self.parse_text(text)
+        return self.parse_text(extract_text_from_file(file_path))
 
-    def _extract_pdf(self, path: Path) -> str:
-        from pypdf import PdfReader
-        reader = PdfReader(str(path))
-        return "\n".join(page.extract_text() or "" for page in reader.pages)
 
-    def _extract_docx(self, path: Path) -> str:
-        from docx import Document
-        doc = Document(str(path))
-        return "\n".join(p.text for p in doc.paragraphs)
+def extract_pdf_text(path: Path) -> str:
+    from pypdf import PdfReader
+    reader = PdfReader(str(path))
+    return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+def extract_docx_text(path: Path) -> str:
+    from docx import Document
+    doc = Document(str(path))
+    return "\n".join(p.text for p in doc.paragraphs)
+
+
+def extract_text_from_file(file_path: Path) -> str:
+    """Extract raw text from a resume file (PDF/DOCX/DOC/plain text).
+
+    Shared by ResumeParser (feeds the LLM) and the ATS parseability
+    checker (compares against it deterministically) — same extraction
+    path, so the checker measures exactly what the parser would see.
+    """
+    suffix = file_path.suffix.lower()
+    if suffix == ".pdf":
+        return extract_pdf_text(file_path)
+    if suffix in (".docx", ".doc"):
+        return extract_docx_text(file_path)
+    return file_path.read_text(encoding="utf-8")
