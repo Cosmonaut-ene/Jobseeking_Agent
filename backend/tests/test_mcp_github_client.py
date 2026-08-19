@@ -1,13 +1,18 @@
 """Tests for the GitHub MCP client wrapper (SPEC 附录 F.7 TASK-B01).
 
 Mocks `_call_tool` — the one function that actually talks to the MCP
-server — so these tests verify the wrapper logic (query building,
-username resolution via get_me, graceful 404-as-None handling, the
-filename-extension language heuristic, result parsing), not a live
-connection. No PAT / confirmed network egress to api.githubcopilot.com
-was available while building this; a human needs to verify live
-behavior separately before TASK-B01's "returns real data" AC is met
-(see DECISIONS.md).
+server — so most of these tests verify wrapper logic (query building,
+username resolution via get_me, graceful 404-as-None handling, result
+parsing), not a live connection. Live-verified 2026-08-19 against a
+real GITHUB_TOKEN via scripts/verify_github_mcp.py — that run caught
+two real bugs neither of these mocked tests could have (mocking
+_call_tool bypasses exactly the machinery that was broken):
+  1. get_file_contents' real response shape (EmbeddedResource holding
+     the actual file content, not the TextContent status message) —
+     see test_parse_result_prefers_embedded_resource_over_status_text.
+  2. anyio TaskGroup wrapping any exception raised inside
+     streamable_http_client/ClientSession in nested ExceptionGroups —
+     see TestExceptionGroupUnwrapping.
 """
 import asyncio
 from unittest.mock import patch
@@ -118,11 +123,15 @@ class TestGetRecentCommits:
 
 class TestReadReadme:
     def test_returns_content_on_success(self, monkeypatch):
+        """_call_tool is mocked here at the wrapper boundary — the real
+        EmbeddedResource-vs-TextContent extraction is covered directly in
+        TestResultParsing below, against the shape a live call actually
+        returned (see module docstring)."""
         monkeypatch.setenv("GITHUB_TOKEN", "test-token")
 
         async def fake_call_tool(tool_name, arguments):
             assert arguments["path"] == "README.md"
-            return {"content": "# Hello"}
+            return "# Hello"  # _parse_result already unwraps EmbeddedResource to a plain string
 
         with patch.object(gc, "_call_tool", side_effect=fake_call_tool):
             readme = _run(gc.read_readme("octocat", "repo1"))
@@ -142,22 +151,42 @@ class TestReadReadme:
 
 
 class TestGetRepoLanguages:
-    def test_infers_languages_from_root_filenames(self, monkeypatch):
+    def test_returns_primary_language_from_search_repositories(self, monkeypatch):
+        """Live-verified (scripts/verify_github_mcp.py): search_repositories
+        results carry a real `.language` field — used instead of the
+        directory-listing heuristic this function started with (see DEC-06)."""
         monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+        captured = {}
 
         async def fake_call_tool(tool_name, arguments):
-            return {"entries": [{"name": "main.py"}, {"name": "app.tsx"}, {"name": "README.md"}]}
+            captured["tool_name"] = tool_name
+            captured["arguments"] = arguments
+            return {"items": [{"full_name": "octocat/repo1", "language": "Python"}]}
 
         with patch.object(gc, "_call_tool", side_effect=fake_call_tool):
             langs = _run(gc.get_repo_languages("octocat", "repo1"))
 
-        assert langs == ["Python", "TypeScript"]
+        assert langs == ["Python"]
+        assert captured["tool_name"] == "search_repositories"
+        assert captured["arguments"]["query"] == "repo:octocat/repo1"
 
-    def test_returns_empty_list_when_repo_unreadable(self, monkeypatch):
+    def test_returns_empty_list_when_repo_not_found(self, monkeypatch):
         monkeypatch.setenv("GITHUB_TOKEN", "test-token")
 
         async def fake_call_tool(tool_name, arguments):
-            raise gc.GitHubMCPRuntimeError("get_file_contents failed: 404")
+            return {"items": []}
+
+        with patch.object(gc, "_call_tool", side_effect=fake_call_tool):
+            langs = _run(gc.get_repo_languages("octocat", "repo1"))
+
+        assert langs == []
+
+    def test_returns_empty_list_when_language_field_is_null(self, monkeypatch):
+        """Repos with no dominant language (e.g. docs-only) have language: null."""
+        monkeypatch.setenv("GITHUB_TOKEN", "test-token")
+
+        async def fake_call_tool(tool_name, arguments):
+            return {"items": [{"full_name": "octocat/repo1", "language": None}]}
 
         with patch.object(gc, "_call_tool", side_effect=fake_call_tool):
             langs = _run(gc.get_repo_languages("octocat", "repo1"))
@@ -187,3 +216,61 @@ class TestResultParsing:
         from mcp import types
         result = types.CallToolResult(content=[types.TextContent(type="text", text="plain text, not json")])
         assert gc._parse_result(result) == "plain text, not json"
+
+    def test_parse_result_prefers_embedded_resource_over_status_text(self):
+        """Regression test for a real bug caught by a live call
+        (scripts/verify_github_mcp.py, 2026-08-19): get_file_contents on a
+        single file returns a TextContent status message ("successfully
+        downloaded text file...") *plus* an EmbeddedResource block holding
+        the actual content. The original _parse_result only read
+        TextContent and silently returned the status message as if it
+        were the file — this locks in the fix against the exact shape a
+        live call produced, not a guessed one."""
+        from mcp import types
+
+        result = types.CallToolResult(
+            content=[
+                types.TextContent(
+                    type="text",
+                    text="successfully downloaded text file (SHA: 18bc70ebe277fbfe6e55e6f9a0ae7e2c3e4bdd83)",
+                ),
+                types.EmbeddedResource(
+                    type="resource",
+                    resource=types.TextResourceContents(
+                        uri="repo://octocat/repo1/sha/abc/contents/README.md",
+                        mime_type="text/plain; charset=utf-8",
+                        text="# Real Content\n",
+                    ),
+                ),
+            ]
+        )
+
+        assert gc._parse_result(result) == "# Real Content\n"
+
+
+class TestExceptionGroupUnwrapping:
+    """Regression coverage for the bug found by scripts/verify_github_mcp.py
+    against a real 422 from GitHub: a plain GitHubMCPRuntimeError raised
+    inside _call_tool's `async with` block came out as a 3-deep-nested
+    BaseExceptionGroup instead — `except GitHubMCPRuntimeError` at any call
+    site would never have fired. Unit-tests the unwrap helper directly
+    since reproducing the real anyio TaskGroup nesting would require an
+    actual network call."""
+
+    def test_unwraps_single_cause_group_to_the_original_exception(self):
+        original = gc.GitHubMCPRuntimeError("boom")
+        wrapped_once = BaseExceptionGroup("eg", [original])
+        wrapped_twice = BaseExceptionGroup("eg", [wrapped_once])
+        wrapped_thrice = BaseExceptionGroup("eg", [wrapped_twice])
+
+        assert gc._unwrap_exception_group(wrapped_thrice) is original
+
+    def test_leaves_multi_cause_group_intact(self):
+        """A genuine multi-error group must not be silently collapsed —
+        that would hide a real concurrent-failure scenario."""
+        group = BaseExceptionGroup("eg", [ValueError("a"), ValueError("b")])
+        assert gc._unwrap_exception_group(group) is group
+
+    def test_non_group_exception_passes_through_unchanged(self):
+        exc = RuntimeError("not a group")
+        assert gc._unwrap_exception_group(exc) is exc
