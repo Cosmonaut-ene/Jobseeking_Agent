@@ -93,3 +93,26 @@ def push_daily_summary(stats: dict, high_jobs: list[Job], mid_jobs: list[Job]) -
             text += f"   {i}. {j.company} - {j.title} ({int(j.match_score * 100)}%)\n"
 
     return _send(text)
+
+
+def push_ready_applications_reminder(applications: list, jobs_by_id: dict) -> bool:
+    """批量提醒："这些岗位已经准备好，记得回 App 确认投递"。
+
+    SPEC 附录 F.6 TASK-D02 / DECISIONS.md DEC-05：纯提醒文案，不含任何可
+    执行的确认操作（消息内一键确认已否决——Discord 纯 webhook 不支持交互
+    按钮，magic link 方案与桌面化后无公网暴露面的目标冲突）。确认动作只能
+    在 App 内针对具体 Job 完成。
+    """
+    text = (
+        f"📝 <b>待确认投递提醒</b>\n\n"
+        f"有 {len(applications)} 个岗位已经生成好定制简历，等你确认投递：\n\n"
+    )
+    for i, app in enumerate(applications[:10], 1):
+        job = jobs_by_id.get(app.job_id)
+        if not job:
+            continue
+        score_pct = int(job.match_score * 100)
+        text += f"   {i}. {job.company} - {job.title} ({score_pct}%)\n"
+    text += "\n👉 请打开 App，在对应岗位页面点击「确认已投递」完成状态更新。"
+
+    return _send(text)

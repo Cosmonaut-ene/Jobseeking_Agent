@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
-  CheckCircle, XCircle, Scissors, Download, Mail,
+  CheckCircle, CheckCircle2, XCircle, Scissors, Download, Mail,
   ExternalLink, ChevronDown, ChevronUp, Copy, Check, Loader2,
 } from 'lucide-react'
-import { api, simulateAts } from '../api/client'
+import { api, simulateAts, confirmApplicationApplied } from '../api/client'
 import type { Job, ResumeVersion, AtsSimulationReport } from '../api/client'
 import JobCard from '../components/JobCard'
 import EvaluationReport from '../components/EvaluationReport'
@@ -218,6 +219,7 @@ function ActionButton({ label, icon: Icon, onClick, loading, variant = 'default'
 
 export default function Jobs() {
   const t = useT()
+  const [searchParams] = useSearchParams()
   const [jobs, setJobs] = useState<Job[]>([])
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -233,6 +235,16 @@ export default function Jobs() {
   const [docxUrl, setDocxUrl] = useState<string | null>(null)
 
   useEffect(() => { fetchJobs() }, [])
+
+  // Deep link from Dashboard's "待确认投递" list (SPEC 附录 F.6 TASK-D02):
+  // /jobs?job=<id> auto-selects that job so the user lands straight on the
+  // confirm-applied action instead of having to search for it.
+  useEffect(() => {
+    const jobId = searchParams.get('job')
+    if (!jobId || selected?.id === jobId) return
+    const match = jobs.find(j => j.id === jobId)
+    if (match) selectJob(match)
+  }, [jobs, searchParams])
 
   async function fetchJobs() {
     setLoading(true)
@@ -270,6 +282,18 @@ export default function Jobs() {
       setActionMsg(t('jobs_resume_tailored')); setActionSuccess(true)
     } catch (e: unknown) { setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Tailor failed'); setActionSuccess(false) }
     finally { setActionLoading(null) }
+  }
+
+  async function confirmApplied(applicationId: string) {
+    setActionLoading('confirm'); setActionMsg('')
+    try {
+      const updated = await confirmApplicationApplied(applicationId)
+      setSelected(j => j ? { ...j, application: updated } : j)
+      setActionMsg(t('jobs_confirm_applied_done')); setActionSuccess(true)
+    } catch (e: unknown) {
+      setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed')
+      setActionSuccess(false)
+    } finally { setActionLoading(null) }
   }
 
   async function apply(jobId: string) {
@@ -379,6 +403,15 @@ export default function Jobs() {
                   </a>
                 )}
                 <ActionButton label={actionLoading === 'apply' ? t('jobs_cover_generating') : t('jobs_cover_letter_btn')} icon={Mail} onClick={() => apply(selected.id)} loading={actionLoading === 'apply'} />
+                {selected.application?.status === 'ready' && (
+                  <ActionButton
+                    label={actionLoading === 'confirm' ? t('jobs_confirming') : t('jobs_confirm_applied_btn')}
+                    icon={CheckCircle2}
+                    onClick={() => confirmApplied(selected.application!.id)}
+                    loading={actionLoading === 'confirm'}
+                    variant="success"
+                  />
+                )}
               </div>
 
               {actionMsg && (

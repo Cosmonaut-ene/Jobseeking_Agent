@@ -68,7 +68,7 @@ def get_advisor_report() -> dict:
     from sqlmodel import Session, func, select
     from backend.app.database import engine
     from backend.app.models.job import Job
-    from backend.app.models.application import Application
+    from backend.app.models.application import Application, ApplicationStatus
     from datetime import datetime
     
     with Session(engine) as session:
@@ -95,12 +95,19 @@ def get_advisor_report() -> dict:
             key=lambda x: x["count"], reverse=True
         )[:8]
         
-        # App stats
+        # App stats — SPEC 附录 F.6 TASK-D01: response_rate 的分母必须是"实际投递
+        # 出去的申请"（status != ready），不能算上 AI 已备好但用户还没确认投递的。
+        # rejected 也算"有回应"（拒信也是一种回复，不是石沉大海）。
+        submitted = [a for a in applications if a.status != ApplicationStatus.ready]
+        responded_or_further = [
+            a for a in submitted
+            if a.status in (ApplicationStatus.responded, ApplicationStatus.interview, ApplicationStatus.rejected)
+        ]
         app_stats = {
-            "applied": len([a for a in applications if a.status == "applied"]),
-            "responded": len([a for a in applications if a.status == "responded"]),
-            "interviews": len([a for a in applications if a.status == "interview"]),
-            "response_rate": f"{len([a for a in applications if a.status in ['responded', 'interview']]) / max(len(applications), 1) * 100:.1f}%"
+            "applied": len(submitted),
+            "responded": len([a for a in submitted if a.status == ApplicationStatus.responded]),
+            "interviews": len([a for a in submitted if a.status == ApplicationStatus.interview]),
+            "response_rate": f"{len(responded_or_further) / max(len(submitted), 1) * 100:.1f}%"
         }
     
     return {
@@ -143,5 +150,27 @@ def get_followups() -> list[dict]:
             for a in apps
             if a.follow_up_date and a.follow_up_date <= today
         ]
-    
+
     return sorted(due, key=lambda x: x["overdue_days"], reverse=True)
+
+
+@router.get("/dashboard/ready-to-confirm")
+def get_ready_to_confirm() -> list[dict]:
+    """Applications AI has prepared but the human hasn't confirmed submitting yet
+    (SPEC 附录 F.6 TASK-D02) — the App-internal list that the reminder push points at."""
+    from sqlmodel import Session, select
+    from backend.app.database import engine
+    from backend.app.models.application import Application, ApplicationStatus
+    from backend.app.models.job import Job
+    from fastapi.encoders import jsonable_encoder
+
+    with Session(engine) as session:
+        apps = session.exec(
+            select(Application).where(Application.status == ApplicationStatus.ready)
+        ).all()
+        jobs = {j.id: j for j in session.exec(select(Job)).all()}
+
+    return [
+        {"application": jsonable_encoder(a), "job": jsonable_encoder(jobs.get(a.job_id))}
+        for a in apps
+    ]

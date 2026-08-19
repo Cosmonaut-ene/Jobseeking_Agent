@@ -4,7 +4,7 @@ from backend.app.models.job import Job, JobStatus
 from backend.app.models.user_profile import (
     UserProfile, Skill, Experience, Project, Preferences, Education, Bullet
 )
-from backend.app.models.application import Application, ApplicationChannel
+from backend.app.models.application import Application, ApplicationChannel, ApplicationStatus
 from backend.app.models.resume_version import ResumeVersion
 
 
@@ -172,7 +172,9 @@ class TestApplicationModel:
             resume_version_id="test-rv-id",
         )
         assert app.channel == ApplicationChannel.easy_apply
-        assert app.status == "pending"
+        # SPEC 附录 F.6 TASK-D01: 状态机接通后默认值从自由字符串 "pending" 改为
+        # 枚举 ApplicationStatus.ready（AI 已备好、尚未确认投递）
+        assert app.status == ApplicationStatus.ready
         assert app.notes == ""
 
     def test_application_channel_enum(self):

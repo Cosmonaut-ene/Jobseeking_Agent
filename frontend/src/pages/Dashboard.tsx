@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Play, Sparkles } from 'lucide-react'
-import { api } from '../api/client'
-import type { AdvisorReport, DashboardStats } from '../api/client'
+import { Play, Sparkles, CheckCircle2 } from 'lucide-react'
+import { api, listReadyToConfirm } from '../api/client'
+import type { AdvisorReport, DashboardStats, ReadyToConfirmEntry } from '../api/client'
 import { useT } from '../contexts/LanguageContext'
 
 export default function Dashboard() {
@@ -10,6 +10,7 @@ export default function Dashboard() {
   const t = useT()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [followups, setFollowups] = useState<{ application: Record<string, unknown>; job: Record<string, string> | null; overdue_days: number }[]>([])
+  const [readyToConfirm, setReadyToConfirm] = useState<ReadyToConfirmEntry[]>([])
   const [report, setReport] = useState<AdvisorReport | null>(null)
   const [loadingReport, setLoadingReport] = useState(false)
   const [reportError, setReportError] = useState('')
@@ -25,7 +26,12 @@ export default function Dashboard() {
   useEffect(() => {
     api.get('/api/dashboard/stats').then(r => setStats(r.data)).catch(() => {})
     api.get('/api/dashboard/followups').then(r => setFollowups(r.data)).catch(() => {})
+    listReadyToConfirm().then(setReadyToConfirm).catch(() => {})
   }, [])
+
+  function goConfirmInJob(jobId: string) {
+    navigate(`/jobs?job=${jobId}`)
+  }
 
   async function runAdvisor() {
     setLoadingReport(true)
@@ -77,6 +83,42 @@ export default function Dashboard() {
           {stats.mid_score_count !== undefined && (
             <span>{t('mid_score_label')} <strong className="text-amber-700 dark:text-amber-400">{stats.mid_score_count}</strong></span>
           )}
+        </div>
+      )}
+
+      {/* Ready to confirm — SPEC 附录 F.6 TASK-D02: AI 已备好但用户还没确认投递的岗位 */}
+      {readyToConfirm.length > 0 && (
+        <div className="glass-card mb-8 overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-200/60 dark:border-white/[0.07] glass-section">
+            <h2 className="font-semibold text-slate-700 dark:text-slate-200">{t('ready_to_confirm_title')}</h2>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="glass-section">
+              <tr>
+                <th className="text-left px-5 py-2 text-slate-500 dark:text-slate-400 font-medium">{t('col_role')}</th>
+                <th className="text-left px-5 py-2 text-slate-500 dark:text-slate-400 font-medium">{t('col_company')}</th>
+                <th className="text-left px-5 py-2 text-slate-500 dark:text-slate-400 font-medium">{t('resume_ats_match')}</th>
+                <th className="text-right px-5 py-2"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-theme">
+              {readyToConfirm.map((entry) => (
+                <tr key={entry.application.id} className="hover:bg-amber-50/40 dark:hover:bg-amber-900/10 transition-colors">
+                  <td className="px-5 py-2 text-slate-700 dark:text-slate-300">{entry.job?.title || '—'}</td>
+                  <td className="px-5 py-2 text-slate-600 dark:text-slate-400">{entry.job?.company || '—'}</td>
+                  <td className="px-5 py-2 text-slate-600 dark:text-slate-400">{entry.job ? Math.round(entry.job.match_score * 100) + '%' : '—'}</td>
+                  <td className="px-5 py-2 text-right">
+                    <button
+                      onClick={() => entry.job && goConfirmInJob(entry.job.id)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors"
+                    >
+                      <CheckCircle2 size={12} />{t('ready_to_confirm_action')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
