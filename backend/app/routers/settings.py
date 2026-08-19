@@ -31,9 +31,6 @@ def get_settings() -> dict:
     return {
         "gemini_api_key_set": bool(os.environ.get("GEMINI_API_KEY")),
         "notification_webhook_set": bool(os.environ.get("NOTIFICATION_WEBHOOK_URL")),
-        "scheduler_enabled": os.environ.get("SCHEDULER_ENABLED", "true").lower() == "true",
-        "scheduler_hour": int(os.environ.get("SCHEDULER_HOUR", "9")),
-        "scheduler_minute": int(os.environ.get("SCHEDULER_MINUTE", "0")),
         "high_score_threshold": float(os.environ.get("HIGH_SCORE_THRESHOLD", "0.80")),
         "mid_score_threshold": float(os.environ.get("MID_SCORE_THRESHOLD", "0.70")),
         **s,
@@ -44,9 +41,6 @@ class SettingsUpdate(BaseModel):
     gemini_api_key: str | None = None
     notification_webhook_url: str | None = None
     notification_chat_id: str | None = None
-    scheduler_enabled: bool | None = None
-    scheduler_hour: int | None = None
-    scheduler_minute: int | None = None
     high_score_threshold: float | None = None
     mid_score_threshold: float | None = None
     scraper_config: dict | None = None
@@ -75,13 +69,6 @@ def update_settings(body: SettingsUpdate) -> dict:
     if body.notification_chat_id is not None:
         os.environ["NOTIFICATION_CHAT_ID"] = body.notification_chat_id
         _set_env("NOTIFICATION_CHAT_ID", body.notification_chat_id)
-    if body.scheduler_enabled is not None:
-        val = "true" if body.scheduler_enabled else "false"
-        os.environ["SCHEDULER_ENABLED"] = val
-        _set_env("SCHEDULER_ENABLED", val)
-    if body.scheduler_hour is not None:
-        os.environ["SCHEDULER_HOUR"] = str(body.scheduler_hour)
-        _set_env("SCHEDULER_HOUR", str(body.scheduler_hour))
     if body.high_score_threshold is not None:
         os.environ["HIGH_SCORE_THRESHOLD"] = str(body.high_score_threshold)
         _set_env("HIGH_SCORE_THRESHOLD", str(body.high_score_threshold))

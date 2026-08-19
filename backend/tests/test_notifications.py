@@ -71,8 +71,8 @@ class TestNotifications:
         assert "87%" in msg
         assert "Sydney" in msg
 
-    def test_push_daily_summary_format(self, monkeypatch):
-        """push_daily_summary should format summary correctly."""
+    def test_push_batch_scrape_summary_format(self, monkeypatch):
+        """push_batch_scrape_summary should format summary correctly."""
         from backend.app import notifications
 
         sent_messages = []
@@ -87,7 +87,7 @@ class TestNotifications:
         mid_job = Job(source="indeed", raw_jd="...", title="Dev", company="Atlassian", match_score=0.75)
 
         stats = {"seek": 15, "linkedin": 20}
-        result = notifications.push_daily_summary(stats, [high_job], [mid_job])
+        result = notifications.push_batch_scrape_summary(stats, [high_job], [mid_job])
 
         assert result is True
         assert len(sent_messages) == 1
@@ -166,8 +166,8 @@ class TestNotifications:
         # No href link should appear
         assert "href" not in sent_messages[0]
 
-    def test_push_daily_summary_with_empty_jobs(self, monkeypatch):
-        """push_daily_summary with no jobs should still send summary."""
+    def test_push_batch_scrape_summary_with_empty_jobs(self, monkeypatch):
+        """push_batch_scrape_summary with no jobs should still send summary."""
         from backend.app import notifications
 
         sent_messages = []
@@ -178,12 +178,12 @@ class TestNotifications:
 
         monkeypatch.setattr(notifications, "_send", mock_send)
 
-        result = notifications.push_daily_summary({"seek": 0, "indeed": 0, "linkedin": 0}, [], [])
+        result = notifications.push_batch_scrape_summary({"seek": 0, "indeed": 0, "linkedin": 0}, [], [])
         assert result is True
         assert len(sent_messages) == 1
 
-    def test_push_daily_summary_shows_score_percentages(self, monkeypatch):
-        """push_daily_summary should show score percentages for jobs."""
+    def test_push_batch_scrape_summary_shows_score_percentages(self, monkeypatch):
+        """push_batch_scrape_summary should show score percentages for jobs."""
         from backend.app import notifications
 
         sent_messages = []
@@ -195,7 +195,7 @@ class TestNotifications:
         monkeypatch.setattr(notifications, "_send", mock_send)
 
         high_job = Job(source="seek", raw_jd="...", title="SWE", company="Google", match_score=0.85)
-        notifications.push_daily_summary({}, [high_job], [])
+        notifications.push_batch_scrape_summary({}, [high_job], [])
         msg = sent_messages[0]
         assert "85%" in msg
 

@@ -7,7 +7,6 @@ dependencies = [
     "google-genai>=1.0.0",
     "sqlmodel>=0.0.22",
     "python-dotenv>=1.0.0",
-    "apscheduler>=3.10.0",
     "playwright>=1.40.0",
     "pypdf>=4.0.0",
     "python-docx>=1.1.0",
@@ -20,9 +19,6 @@ dependencies = [
     "faker>=40.0.0",
     "snowflake-connector-python>=4.0.0",
 ]
-
-[project.scripts]
-daily-scout = "scripts.daily_scout:main"
 
 [build-system]
 requires = ["hatchling"]

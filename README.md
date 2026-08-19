@@ -16,7 +16,7 @@ An AI-powered personal job search automation platform. It scrapes job boards dai
 - **LinkedIn** — No-login guest API scraper (zero account risk, no cookies required)
 - **Manual entry** — Paste any job description into the Scout page for instant analysis
 - **URL deduplication** — Already-seen jobs are skipped automatically
-- **Scheduled daily scrape** — Runs all three sources at a configurable time (default 9:00 AM)
+- **Manual batch scrape** — Trigger all sources on demand from the Notifications page (no background scheduler; see SPEC.md 附录 F.8 TASK-A01)
 
 ### AI Matching & Evaluation (Scout Agent)
 Every job is evaluated against your profile by Gemini 2.5 Flash and produces a **5-section structured report**:
@@ -72,7 +72,6 @@ Jobs below `MID_SCORE_THRESHOLD` (default 70%) are automatically discarded. Jobs
 | AI | Google Gemini 2.5 Flash | google-genai ≥ 1.0 |
 | Web scraping | Playwright (Chromium) | 1.40 |
 | LinkedIn scraping | httpx + BeautifulSoup4 | guest API, no login |
-| Scheduling | APScheduler | 3.10 |
 | Resume parsing | pypdf + python-docx | 4.0 / 1.1 |
 | PDF generation | WeasyPrint + Jinja2 | — |
 | Frontend | React 18 + TypeScript | 18.3 / 5.4 |
@@ -122,10 +121,6 @@ NOTIFICATION_CHAT_ID=your_chat_id
 HIGH_SCORE_THRESHOLD=0.80
 MID_SCORE_THRESHOLD=0.70
 
-# Optional — scheduler
-SCHEDULER_ENABLED=true
-SCHEDULER_HOUR=9
-SCHEDULER_MINUTE=0
 DEFAULT_MAX_JOBS=15
 ```
 
@@ -179,9 +174,6 @@ Monitor pipeline stats, check the AI Advisor report for skill gap insights, and 
 | `NOTIFICATION_CHAT_ID` | — | Optional `chat_id` field added to webhook payload |
 | `HIGH_SCORE_THRESHOLD` | `0.80` | ATS score threshold for instant notification |
 | `MID_SCORE_THRESHOLD` | `0.70` | Minimum score to save a job (below this is discarded) |
-| `SCHEDULER_ENABLED` | `true` | Enable daily auto-scrape |
-| `SCHEDULER_HOUR` | `9` | Hour to run the daily scrape (24-hour, local time) |
-| `SCHEDULER_MINUTE` | `0` | Minute to run the daily scrape |
 | `DEFAULT_MAX_JOBS` | `15` | Default max results per scraper run |
 
 ---
