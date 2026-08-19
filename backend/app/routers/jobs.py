@@ -124,10 +124,10 @@ def tailor_job(job_id: str) -> dict:
             if not job:
                 raise HTTPException(404, "Job not found")
             agent = TailorAgent()
+            # TailorAgent.run() persists every iteration round itself (SPEC 附录 F.5
+            # TASK-C04 — 每轮版本均须落库保留，不得覆盖历史版本) and returns the
+            # best-scoring, already-committed version. Do not re-add/commit it here.
             resume_version = agent.run(job, profile)
-            session.add(resume_version)
-            session.commit()
-            session.refresh(resume_version)
             result = jsonable_encoder(resume_version)
             # Generate PDF
             try:
