@@ -69,3 +69,19 @@
 - Telegram 风格 inline keyboard：技术上可行但用户用的是 Discord，不适用；且引入"按 webhook 类型分叉不同确认机制"的复杂度，不划算
 - Magic link 免登录确认：见上，与模块 A 冲突
 - 完整 Discord Bot Application（slash commands + interaction endpoint）：工作量与收益不成比例，且需要一个公网可达的 interaction endpoint，同样与桌面化方向冲突
+
+---
+
+### DEC-06: GitHub MCP 走远程 endpoint，不走本地 Docker；`list_repos`/`get_repo_languages` 无直接对应工具，用替代方案实现
+
+**决策**：TASK-B01 用 GitHub 官方远程 MCP server（`https://api.githubcopilot.com/mcp/`，HTTP/SSE，`Authorization: Bearer <PAT>`），不用本地 Docker 镜像（`ghcr.io/github/github-mcp-server`）。`list_repos()` 用 `search_repositories(query="user:<username>")` 代替（无直接的 list-repos 工具）；`get_repo_languages()` 用 `get_file_contents(path="")` 读根目录 + 文件名后缀启发式代替（无直接的语言统计工具）。
+
+**原因**：
+- 本机 Docker daemon 本身是坏的（`docker info` 直接 segfault），本地 Docker 传输方案在这个开发环境里走不通；远程 HTTP endpoint 不需要本地进程，绕开这个问题。
+- GitHub 官方文档（`github/github-mcp-server` 的 README.md / docs/remote-server.md，人工核实、非本 agent 独立抓取）里 `repos` toolset 没有直接的"列出用户仓库"或"获取语言统计"工具；前者官方文档给出的等价做法就是 `search_repositories` 加 `user:` 限定符，后者没有现成替代，只能退化成目录列表 + 文件后缀名的启发式，精度低于真实的按字节数加权语言统计。
+- **本次开发过程中没有可用的 GITHUB_TOKEN，也没确认到 `api.githubcopilot.com` 的出口网络权限，未做过一次真实的实时调用**——MCP Python SDK 的用法（`streamable_http_client`/`ClientSession`/`CallToolResult` 字段结构）是装了 `mcp==2.0.0` 包后针对已安装的 SDK 实测验证的，但"调用 GitHub 真实工具会返回什么"这件事没有验证过。TASK-B01 的 AC「四项调用均可返回真实数据」需要人工用真实 token 跑一遍才能算完成。
+
+**被拒绝的方案**：
+- 本地 Docker 镜像传输：Docker daemon 在开发环境里坏的，走不通
+- 自己封装 GitHub REST API 代替 MCP：SPEC 明确禁止（"不得自行封装 GitHub REST API，必须走 MCP server"，本 Task 的目的之一就是验证工具可插拔性）
+- 为 `get_repo_languages` 找不到直接工具就先跳过整个 B01：判断为不必要——三个功能齐全的工具（`get_me`/`search_repositories`/`get_file_contents`/`list_commits`）已经能覆盖 B02 大部分需求，语言统计用降级方案先跑起来，比整体阻塞划算
