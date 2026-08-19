@@ -3,8 +3,8 @@ import {
   CheckCircle, XCircle, Scissors, Download, Mail,
   ExternalLink, ChevronDown, ChevronUp, Copy, Check, Loader2,
 } from 'lucide-react'
-import { api } from '../api/client'
-import type { Job, ResumeVersion } from '../api/client'
+import { api, simulateAts } from '../api/client'
+import type { Job, ResumeVersion, AtsSimulationReport } from '../api/client'
 import JobCard from '../components/JobCard'
 import EvaluationReport from '../components/EvaluationReport'
 import { useT } from '../contexts/LanguageContext'
@@ -43,20 +43,68 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
+function AtsScoreBadge({ label, pct, sourceNote }: { label: string; pct: number; sourceNote?: string }) {
+  const color = pct >= 70 ? 'text-emerald-700 dark:text-emerald-400' : pct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+  return (
+    <span className="text-xs text-slate-500 dark:text-slate-400">
+      {label} <strong className={color}>{pct}%</strong>
+      {sourceNote && <span className="text-slate-400 dark:text-zinc-500 ml-0.5">{sourceNote}</span>}
+    </span>
+  )
+}
+
 function ResumePanel({ resume }: { resume: ResumeVersion }) {
   const t = useT()
   const content = resume.content_json as TailoredContent
   const atsPct = Math.round(resume.ats_score * 100)
+  const [sim, setSim] = useState<AtsSimulationReport | null>(resume.ats_report ?? null)
+  const [simLoading, setSimLoading] = useState(false)
+
+  useEffect(() => {
+    setSim(resume.ats_report ?? null)
+  }, [resume.id, resume.ats_report])
+
+  async function runSimulation() {
+    setSimLoading(true)
+    try {
+      const report = await simulateAts(resume.id)
+      setSim(report)
+    } catch {
+      // 确定性校验失败不影响页面其余功能，静默失败，用户可再次点击重试
+    } finally {
+      setSimLoading(false)
+    }
+  }
+
   return (
     <div className="glass-card text-sm divide-theme overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 glass-section rounded-t-xl">
+      <div className="flex items-center justify-between px-4 py-2.5 glass-section rounded-t-xl flex-wrap gap-1.5">
         <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
           <Scissors size={13} className="text-amber-500" />{t('resume_panel_title')}
         </span>
-        <span className="text-xs text-slate-500 dark:text-slate-400">
-          {t('resume_ats_match')} <strong className={atsPct >= 70 ? 'text-emerald-700 dark:text-emerald-400' : atsPct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}>{atsPct}%</strong>
-        </span>
+        <div className="flex items-center gap-3">
+          <AtsScoreBadge label={t('resume_ats_match')} pct={atsPct} sourceNote={t('resume_ats_ai_estimate_note')} />
+          {sim && <AtsScoreBadge label={t('resume_ats_deterministic')} pct={Math.round(sim.deterministic_ats_score)} />}
+          <button
+            onClick={runSimulation}
+            disabled={simLoading}
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 hover:text-amber-700 dark:hover:text-amber-300 transition-colors disabled:opacity-60"
+          >
+            {simLoading && <Loader2 size={11} className="animate-spin" />}
+            {simLoading ? t('resume_ats_sim_running') : t('resume_run_ats_sim')}
+          </button>
+        </div>
       </div>
+      {sim && sim.diagnosis.length > 0 && (
+        <div className="px-4 pt-3 space-y-1">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-zinc-500">{t('resume_ats_diagnosis_title')}</h4>
+          <ul className="space-y-1">
+            {sim.diagnosis.map((d, i) => (
+              <li key={i} className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed border-l-2 border-amber-300 dark:border-amber-700 pl-2">{d}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="p-4 space-y-4">
         {resume.changes_summary && <p className="text-xs text-slate-500 dark:text-slate-400 italic border-l-2 border-amber-300 pl-2">{resume.changes_summary}</p>}
         {content.summary && (

@@ -63,7 +63,37 @@ export interface ResumeVersion {
   content_json: Record<string, unknown>
   ats_score: number
   changes_summary: string
+  deterministic_ats_score?: number
+  ats_report?: AtsSimulationReport | null
   created_at: string
+}
+
+// ── ATS Simulation (确定性评分，SPEC 附录 F.5) ─────────────────────────────────
+
+export interface ParseabilityReport {
+  score: number
+  extracted_char_count: number
+  missing_fields: string[]
+  warnings: string[]
+}
+
+export interface KeywordMatchReport {
+  score: number
+  hits: string[]
+  misses: string[]
+  alias_hits: [string, string][]
+}
+
+export interface AtsSimulationReport {
+  deterministic_ats_score: number
+  parseability: ParseabilityReport
+  keyword_match: KeywordMatchReport
+  diagnosis: string[]
+}
+
+export async function simulateAts(resumeVersionId: string): Promise<AtsSimulationReport> {
+  const r = await api.post('/api/ats/simulate', { resume_version_id: resumeVersionId })
+  return r.data
 }
 
 export interface Application {
