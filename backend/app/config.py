@@ -31,3 +31,8 @@ SCHEDULER_ENABLED: bool = os.environ.get("SCHEDULER_ENABLED", "true").lower() ==
 
 # Scraper defaults
 DEFAULT_MAX_JOBS: int = int(os.environ.get("DEFAULT_MAX_JOBS", "15"))
+
+# Tailor evaluator-optimizer loop (SPEC 附录 F.5 TASK-C04)
+# deterministic_ats_score（0-100）达到此阈值即停止迭代；反馈信号用确定性分数，不用 LLM 自评
+TAILOR_DETERMINISTIC_THRESHOLD: float = float(os.environ.get("TAILOR_DETERMINISTIC_THRESHOLD", "80"))
+TAILOR_MAX_ITERATIONS: int = int(os.environ.get("TAILOR_MAX_ITERATIONS", "2"))

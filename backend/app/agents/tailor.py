@@ -14,6 +14,9 @@ import re
 from google import genai
 from google.genai import types
 
+from backend.app import config
+from backend.app.ats.simulator import find_latest_uploaded_resume, flatten_resume_version_text, simulate_ats
+from backend.app.database import get_session
 from backend.app.models.job import Job
 from backend.app.models.resume_version import ResumeVersion
 from backend.app.models.user_profile import UserProfile
@@ -83,14 +86,81 @@ TAILOR_SCHEMA = types.Schema(
 
 
 class TailorAgent:
-    def __init__(self) -> None:
+    def __init__(self, max_iterations: int | None = None, deterministic_threshold: float | None = None) -> None:
         self.client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        self.max_iterations = max_iterations if max_iterations is not None else config.TAILOR_MAX_ITERATIONS
+        self.deterministic_threshold = (
+            deterministic_threshold
+            if deterministic_threshold is not None
+            else config.TAILOR_DETERMINISTIC_THRESHOLD
+        )
 
     def run(self, job: Job, user_profile: UserProfile) -> ResumeVersion:
-        result = self._tailor(job, user_profile)
+        """有界 Evaluator-Optimizer 迭代（SPEC 附录 F.5 TASK-C04）。
+
+        生成 → 确定性评分 → 若低于阈值携带缺失关键词反馈重写 → 重新评分，
+        最多 self.max_iterations 轮。反馈信号与停止条件都用**确定性分数**
+        （deterministic_ats_score），不用 LLM 自评的 ats_score 驱动——避免
+        "用一个模型的主观判断评估另一个模型的主观判断"。
+
+        每一轮都会**独立落库**（本方法自己持久化，调用方不需要再 add/commit），
+        不覆盖历史版本——每轮都是一条新的 ResumeVersion 记录，最终只返回
+        deterministic_ats_score 最高的一版，但其余轮次的记录仍保留在数据库里。
+        没有已上传的简历文件时无法计算确定性分数，退化为单轮、不迭代。
+        """
+        resume_file = self._find_resume_file()
+        versions: list[ResumeVersion] = []
+        feedback_keywords: list[str] | None = None
+
+        for round_num in range(1, self.max_iterations + 1):
+            resume_version = self._run_one_round(job, user_profile, feedback_keywords)
+
+            if resume_file is not None:
+                score, report, misses = self._score_deterministically(
+                    job, user_profile, resume_file, resume_version
+                )
+                resume_version.deterministic_ats_score = score
+                resume_version.ats_report = report
+                feedback_keywords = misses
+
+            # 每轮独立落库——不得覆盖历史版本（每个 ResumeVersion 有自己的 UUID 主键）
+            with get_session() as session:
+                session.add(resume_version)
+                session.commit()
+                session.refresh(resume_version)
+
+            versions.append(resume_version)
+            _logger.info(
+                "[Tailor] Job %s round %d/%d: ats_score=%.2f deterministic_ats_score=%.1f",
+                job.id, round_num, self.max_iterations,
+                resume_version.ats_score, resume_version.deterministic_ats_score,
+            )
+
+            if resume_file is None:
+                break  # 无法算确定性分数，没有反馈依据，不迭代
+            if resume_version.deterministic_ats_score >= self.deterministic_threshold:
+                break
+            if not feedback_keywords:
+                break  # 没有缺失关键词可反馈，再迭代也不会产生新信息
+
+        best = max(versions, key=lambda v: v.deterministic_ats_score)
+        _logger.info(
+            "[Tailor] Job %s completed %d round(s), selected version deterministic_ats_score=%.1f",
+            job.id, len(versions), best.deterministic_ats_score,
+        )
+        return best
+
+    def _find_resume_file(self):
+        return find_latest_uploaded_resume(config.RESUMES_DIR)
+
+    def _run_one_round(
+        self, job: Job, user_profile: UserProfile, feedback_keywords: list[str] | None
+    ) -> ResumeVersion:
+        result = self._tailor(job, user_profile, feedback_keywords=feedback_keywords)
         ats_score = self._eval_ats_score(result, job.raw_jd) / 100
 
-        # Post-process: detect numbers added by LLM that aren't in source_raw
+        # Post-process: detect numbers added by LLM that aren't in source_raw.
+        # Runs every round, unconditionally — never skipped because of iteration.
         validation_warnings = _validate_bullets(result)
         changes_summary = result["changes_summary"]
         if validation_warnings:
@@ -125,11 +195,39 @@ class TailorAgent:
             changes_summary=changes_summary,
         )
 
-    def _tailor(self, job: Job, user_profile: UserProfile) -> dict:
+    def _score_deterministically(self, job, user_profile, resume_file, resume_version):
+        """返回 (deterministic_ats_score, ats_report dict, keyword misses)。"""
+        ats_keywords = job.gap_analysis.get("resume_improvements", {}).get("ats_keywords", [])
+        resume_text = flatten_resume_version_text(resume_version.content_json)
+        llm_ats_pct = job.match_score * 100 if job.match_score else None
+
+        report = simulate_ats(
+            resume_file_path=resume_file,
+            profile=user_profile,
+            jd_text=job.raw_jd,
+            ats_keywords=ats_keywords,
+            resume_text=resume_text,
+            llm_ats_pct=llm_ats_pct,
+        )
+        return report.deterministic_ats_score, report.model_dump(), report.keyword_match.misses
+
+    def _tailor(
+        self, job: Job, user_profile: UserProfile, feedback_keywords: list[str] | None = None
+    ) -> dict:
         profile_text = user_profile.to_prompt_text()
         resume_improvements = job.gap_analysis.get("resume_improvements", {})
         ats_keywords: list[str] = resume_improvements.get("ats_keywords", [])
         metrics_suggestions: list[str] = resume_improvements.get("metrics_suggestions", [])
+
+        feedback_block = ""
+        if feedback_keywords:
+            feedback_block = (
+                "\n## Previous Attempt Feedback\n"
+                "The previous version was missing these exact keywords (confirmed by literal "
+                "string match against your output, not a guess) — make sure this version "
+                "actually contains them verbatim, where truthful and contextually appropriate:\n"
+                f"{', '.join(feedback_keywords)}\n"
+            )
 
         prompt = (
             f"## Job Description\n{job.raw_jd}\n\n"
@@ -140,7 +238,8 @@ class TailorAgent:
             f"## Target ATS Keywords (incorporate these into bullets where appropriate)\n"
             f"{', '.join(ats_keywords)}\n\n"
             f"## Quantification Opportunities\n"
-            f"{chr(10).join('- ' + s for s in metrics_suggestions)}\n\n"
+            f"{chr(10).join('- ' + s for s in metrics_suggestions)}\n"
+            f"{feedback_block}\n"
             f"## Candidate Profile\n{profile_text}\n\n"
             "Tailor the resume for this job. Select the most relevant projects and rewrite "
             "their bullets to align with the JD keywords. Follow the strict rules."

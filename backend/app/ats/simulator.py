@@ -23,6 +23,42 @@ DIAGNOSIS_DIFF_THRESHOLD = 20.0
 _PARSEABILITY_WEIGHT = 0.6
 _KEYWORD_MATCH_WEIGHT = 0.4
 
+# 系统生成文件不算"用户上传的简历"（F-CONF-01），寻找最新上传件时排除
+_GENERATED_FILE_PREFIXES = ("tailored_", "base_resume")
+
+
+def find_latest_uploaded_resume(resumes_dir: Path) -> Path | None:
+    """在 resumes_dir 里找用户最近一次上传的原始简历文件。
+
+    共享给 routers/ats.py（TASK-C03）与 TailorAgent（TASK-C04）——两处都需要
+    "用户实际会拿去投递的那份文件"，不是系统生成的 tailored_*/base_resume* 产物。
+    """
+    if not resumes_dir.exists():
+        return None
+    candidates = [
+        p for p in resumes_dir.iterdir()
+        if p.is_file() and not p.name.startswith(_GENERATED_FILE_PREFIXES)
+    ]
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def flatten_resume_version_text(content_json: dict) -> str:
+    """把 ResumeVersion.content_json（Tailor 的输出）拍平成纯文本，供关键词匹配使用。"""
+    parts: list[str] = [content_json.get("summary", "")]
+    parts.append(", ".join(content_json.get("skills", [])))
+    for proj in content_json.get("projects", []):
+        parts.append(proj.get("name", ""))
+        for bullet in proj.get("bullets", []):
+            text = bullet.get("rewritten", "") if isinstance(bullet, dict) else str(bullet)
+            parts.append(text)
+    for exp in content_json.get("experience", []):
+        parts.append(f"{exp.get('role', '')} {exp.get('company', '')}")
+        for bullet in exp.get("bullets", []):
+            parts.append(bullet if isinstance(bullet, str) else str(bullet))
+    return "\n".join(p for p in parts if p)
+
 
 class ATSSimulationReport(BaseModel):
     deterministic_ats_score: float
