@@ -2089,12 +2089,26 @@ _本附录为规划记录，非实现文档。各 Task 的 AC 需经人工确认
 **状态**：`planning` — 仅 G01 已拆分到可开发粒度，G02–G04 待 G01 结果验证后再拆
 **决策**：先迁移 `ResumeParser` 单点验证可行性，通过后逐个迁移其余 3 个 agent（`ScoutAgent` → `TailorAgent` → `CoverLetterAgent`），**不做大爆炸式整体替换**
 
-### G.0 范围与前提（未经验证，不得假设）
+### G.0 范围与前提（人工已核实，2026-08-19）
 
-> 按 CLAUDE.md「Never fill in API documentation links or versions；human 负责核实外部依赖有效性」，以下事项**必须由人工在开发前自行核实**，本 SPEC 不代为验证或假设结果：
-> - DeepSeek-V4 API 的 `response_format` / structured output 能力，能否等价替代 Gemini `types.Schema` 的 `required` 字段强制、嵌套 object、`enum` 约束
-> - 是否存在等价于 `response_mime_type="application/json"` 的强 JSON 输出保证，还是仅能靠 prompt 约束（若是后者，需重新评估 §8.6 类似的"输出不稳定"风险是否会在新 provider 上更严重）
-> - API 调用方式（SDK 还是 OpenAI 兼容 REST）、鉴权方式、速率限制
+> 以下为人工核实 DeepSeek-V4 官方文档后确认的信息，取代此前「待核实」的占位——按 CLAUDE.md，外部依赖的有效性由人工负责，此处直接采信，不再视为阻塞项。
+
+**结构化输出：两种模式，本项目采用 `json_schema` 严格模式**
+
+| 模式 | 约束力 | 是否采用 |
+|---|---|---|
+| `json_object`（基础） | 仅保证输出是合法 JSON，无字段/类型/required 约束，需在 prompt 里手动示例引导；偶发空内容 | ❌ 不采用——弱于 Gemini 现状，会引入新的不稳定性 |
+| `json_schema`（严格，`strict: true`） | 字段类型、枚举值、正则约束、嵌套 object 均强制校验，与 Gemini `types.Schema` 的约束力**大致对等** | ✅ 采用，是本次迁移不降级现有可靠性的前提 |
+
+调用方式：`response_format={"type": "json_schema", "json_schema": {"name": ..., "strict": True, "schema": {...}}}`，schema 为标准 JSON Schema 格式（不是 Gemini 的 `types.Schema` 对象）——**因此每个 agent 迁移时都需要把对应的 `*_SCHEMA` 从 `types.Schema` 改写成标准 JSON Schema dict，不是简单换一下 client**。
+
+API 层面走 OpenAI SDK 兼容路线，鉴权用标准 Bearer token（`DEEPSEEK_API_KEY`）。
+
+**两个必须写进代码约束的坑**：
+1. 返回体里 `content` 字段才是结构化输出结果，`reasoning_content`（思维链字段）**不得**参与解析——如果开了 thinking 模式，两个字段会同时出现，解析逻辑必须只读 `content`。
+2. `json_schema` 模式下需要合理设置 `max_tokens`，否则长输出（尤其是 `TAILOR_SCHEMA`/`EVAL_SCHEMA` 这种嵌套数组多的）可能被截断成不合法 JSON；`ResumeParser` 的 `PROFILE_SCHEMA` 相对小，G01 阶段这个风险较低，但 G02/G03 迁移时必须重新评估 `max_tokens` 取值。
+
+vLLM 自部署场景下 thinking 模式与 `response_format` 混用有已知 bug——本项目走官方 API，不涉及自部署，**不适用**，仅记录以防未来改自部署时踩坑。
 
 **本次迁移不解决、不涉及**：
 - 迁移动机（成本 / 性能 / 其他）未明确记录，不影响本附录的技术拆分，但如涉及"是否要保留 Gemini 作为 fallback"这类产品决策，需另行确认
@@ -2103,21 +2117,25 @@ _本附录为规划记录，非实现文档。各 Task 的 AC 需经人工确认
 ### TASK-G01：ResumeParser 迁移至 DeepSeek-V4（验证性 Task）
 
 - **目的**：用四个 agent 里 schema 最简单的一个（`PROFILE_SCHEMA`，无深层嵌套 enum 逻辑）做迁移可行性验证，其结果决定 G02–G04 是否继续、以及要不要调整迁移策略
-- **输入**：现有 `backend/app/agents/parser.py`；人工已核实的 DeepSeek-V4 API 文档（见 G.0，本 Task 开始前必须完成）
+- **输入**：现有 `backend/app/agents/parser.py`；G.0 中已核实的 DeepSeek-V4 API 约定
 - **输出**：
-  - 改造 `ResumeParser.__init__` 与 `parse_text()`/`parse_file()` 内部调用，替换为 DeepSeek-V4
+  - 改造 `ResumeParser.__init__` 与 `parse_text()`/`parse_file()` 内部调用，替换为 DeepSeek-V4，使用 **OpenAI 兼容 SDK**，`response_format` 用 `json_schema` 严格模式（**不用** `json_object`，见 G.0）
+  - 将 `PROFILE_SCHEMA` 从 Gemini 的 `types.Schema` 对象改写为标准 JSON Schema dict（`type`/`properties`/`required`/`enum` 等字段名与 Gemini 版本不同，需逐项对照改写，不是简单序列化转换）
   - 新增环境变量 `DEEPSEEK_API_KEY`（写入 `.env.example`，不含真实值），`config.py` 新增对应读取
   - **保留** `GEMINI_API_KEY` 及其读取逻辑不变——本 Task 只动 `ResumeParser` 一个 agent，其余三个仍用 Gemini，两个 key 需同时存在
-  - 产出一份迁移记录（追加进 `DECISIONS.md`）：记录 schema 约束能力的实测差异、是否需要额外的输出校验兜底（类比 `scout.py` 的 null 归一化经验）
+  - 产出一份迁移记录（追加进 `DECISIONS.md`）：记录 `json_schema` 严格模式的实测约束力、是否需要额外的输出校验兜底（类比 `scout.py` 的 null 归一化经验）
 - **约束 / 不得做**：
-  - **不得**改动 `PROFILE_SCHEMA` 的字段定义本身（技能等级判定规则、years 推断规则等 prompt 设计保持不变），本 Task 只换底层调用，不做 prompt 层面的同步优化——避免"换模型"和"改 prompt"两件事混在一次改动里，出问题时无法定位是哪一层导致
+  - **不得**改动 `PROFILE_SCHEMA` 的字段定义本身（技能等级判定规则、years 推断规则等 prompt 设计保持不变），本 Task 只换底层调用和 schema 的格式表达，不做 prompt 层面的同步优化——避免"换模型"和"改 prompt"两件事混在一次改动里，出问题时无法定位是哪一层导致
   - **不得**改动 `profile.py` 路由层对 `ResumeParser` 的调用方式（对外接口不变）
-  - 若发现 DeepSeek-V4 的结构化输出约束力明显弱于 Gemini（如无法保证 `required` 字段一定存在），**不得**跳过校验强行合并，必须在代码层补一层类似 `scout.py` 的 `or default` 兜底，并在 `DECISIONS.md` 中记录原因
+  - 解析响应时**只读 `content` 字段**，`reasoning_content` 不得参与业务逻辑（见 G.0 坑 1）
+  - 必须显式设置 `max_tokens` 并留有余量，不得使用默认值（见 G.0 坑 2）——即使 `PROFILE_SCHEMA` 本身较小，也要在代码里写明这个值是有意设置的，不是遗漏
+  - 若实测发现 `json_schema` 严格模式在某些字段上约束力仍弱于 Gemini（如空内容偶发问题文档已提示存在），**不得**跳过校验强行合并，必须在代码层补一层类似 `scout.py` 的 `or default` 兜底，并在 `DECISIONS.md` 中记录原因
 - **AC**：
   - `POST /api/profile/upload-resume`、`POST /api/profile/parse-resume` 两个端点在切换后行为不变（返回结构与现状一致）
   - 现有 `backend/tests/test_*.py` 中涉及 ResumeParser 的用例全部通过（mock 调整为 mock DeepSeek 客户端而非 Gemini）
   - 新增至少 3 组真实简历文本的人工比对：DeepSeek 输出 vs 原 Gemini 输出，记录字段级差异（不要求完全一致，但需人工判断"是否可用"）
-  - `DECISIONS.md` 中新增一条记录，写明本次验证结论与是否建议继续 G02
+  - 至少验证一次"故意构造超长简历文本"的场景，确认 `max_tokens` 设置不会导致截断成不合法 JSON
+  - `DECISIONS.md` 中新增一条记录，写明本次验证结论、`json_schema` 模式的实测可靠性，以及是否建议继续 G02
 
 ### TASK-G02 / G03 / G04：ScoutAgent / TailorAgent / CoverLetterAgent 迁移
 
