@@ -121,19 +121,39 @@ class TestGetRecentCommits:
         assert captured == {"owner": "octocat", "repo": "repo1"}
 
 
-class TestReadReadme:
+def _make_file_content_result(text: str):
+    """Build a CallToolResult shaped like a real single-file get_file_contents
+    success — status TextContent + EmbeddedResource holding the real content,
+    matching what a live call actually returned (see module docstring)."""
+    from mcp import types
+    return types.CallToolResult(
+        content=[
+            types.TextContent(type="text", text="successfully downloaded text file (SHA: abc)"),
+            types.EmbeddedResource(
+                type="resource",
+                resource=types.TextResourceContents(
+                    uri="repo://octocat/repo1/sha/abc/contents/README.md",
+                    mime_type="text/plain; charset=utf-8",
+                    text=text,
+                ),
+            ),
+        ]
+    )
+
+
+class TestReadFile:
+    """read_file() (read_readme is a thin wrapper around it) — tested via
+    _call_tool_raw, which is what it actually calls now (post live-verification
+    fix, see DEC-06 update / TestFuzzyMatchNotTreatedAsContent below)."""
+
     def test_returns_content_on_success(self, monkeypatch):
-        """_call_tool is mocked here at the wrapper boundary — the real
-        EmbeddedResource-vs-TextContent extraction is covered directly in
-        TestResultParsing below, against the shape a live call actually
-        returned (see module docstring)."""
         monkeypatch.setenv("GITHUB_TOKEN", "test-token")
 
-        async def fake_call_tool(tool_name, arguments):
+        async def fake_call_tool_raw(tool_name, arguments):
             assert arguments["path"] == "README.md"
-            return "# Hello"  # _parse_result already unwraps EmbeddedResource to a plain string
+            return _make_file_content_result("# Hello")
 
-        with patch.object(gc, "_call_tool", side_effect=fake_call_tool):
+        with patch.object(gc, "_call_tool_raw", side_effect=fake_call_tool_raw):
             readme = _run(gc.read_readme("octocat", "repo1"))
 
         assert readme == "# Hello"
@@ -141,13 +161,41 @@ class TestReadReadme:
     def test_returns_none_not_exception_when_file_missing(self, monkeypatch):
         monkeypatch.setenv("GITHUB_TOKEN", "test-token")
 
-        async def fake_call_tool(tool_name, arguments):
+        async def fake_call_tool_raw(tool_name, arguments):
             raise gc.GitHubMCPRuntimeError("get_file_contents failed: 404 Not Found")
 
-        with patch.object(gc, "_call_tool", side_effect=fake_call_tool):
+        with patch.object(gc, "_call_tool_raw", side_effect=fake_call_tool_raw):
             readme = _run(gc.read_readme("octocat", "repo1"))
 
         assert readme is None
+
+    def test_fuzzy_match_suggestion_not_treated_as_real_content(self, monkeypatch):
+        """Regression test for a real bug caught by scripts/verify_github_mcp.py
+        during TASK-B02 (which retroactively affects B01 too): when the exact
+        path doesn't exist but similar paths do, get_file_contents returns
+        is_error=False with ONLY a TextContent suggestion message — no
+        EmbeddedResource. The old implementation returned that message as if
+        it were the file, which downstream code (profile_sync's dependency
+        parser) silently turned into a fake dependency named "resolved" (the
+        message's first word). Must return None, not the suggestion text."""
+        from mcp import types
+
+        async def fake_call_tool_raw(tool_name, arguments):
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text='Resolved potential matches in the repository tree (resolved refs: '
+                             '{"Ref":"refs/heads/main","SHA":"abc"}, matching files: '
+                             '["backend/requirements.txt"]).',
+                    )
+                ]
+            )
+
+        with patch.object(gc, "_call_tool_raw", side_effect=fake_call_tool_raw):
+            content = _run(gc.read_file("octocat", "repo1", "requirements.txt"))
+
+        assert content is None
 
 
 class TestGetRepoLanguages:

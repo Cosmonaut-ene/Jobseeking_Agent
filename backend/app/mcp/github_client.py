@@ -115,9 +115,13 @@ def _unwrap_exception_group(exc: BaseException) -> BaseException:
     return exc
 
 
-async def _call_tool(tool_name: str, arguments: dict[str, Any]) -> Any:
-    """建立一次性 MCP session 调用单个工具。GitHub 官方远程 server 是无状态友好
-    的 stateless streamable-http，每次调用重新握手比维护长连接简单可靠。"""
+async def _call_tool_raw(tool_name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+    """底层调用，返回未解析的 CallToolResult。read_file() 需要检查
+    EmbeddedResource 是否存在（见该函数注释里"resolved potential matches"那个
+    真实踩过的坑），比 _call_tool() 解析后的返回值粒度更细，所以单独暴露这层。
+    建立一次性 MCP session 调用单个工具——GitHub 官方远程 server 是无状态友好
+    的 stateless streamable-http，每次调用重新握手比维护长连接简单可靠。
+    """
     token = _require_token()
     http_client = httpx2.AsyncClient(
         headers={
@@ -133,9 +137,14 @@ async def _call_tool(tool_name: str, arguments: dict[str, Any]) -> Any:
                 result = await session.call_tool(tool_name, arguments)
                 if result.is_error:
                     raise GitHubMCPRuntimeError(f"{tool_name} failed: {_extract_text(result)}")
-                return _parse_result(result)
+                return result
     except BaseExceptionGroup as eg:
         raise _unwrap_exception_group(eg) from eg
+
+
+async def _call_tool(tool_name: str, arguments: dict[str, Any]) -> Any:
+    result = await _call_tool_raw(tool_name, arguments)
+    return _parse_result(result)
 
 
 async def get_current_user() -> dict:
@@ -181,20 +190,35 @@ async def get_recent_commits(
     return result if isinstance(result, list) else (result or {}).get("commits", [])
 
 
-async def read_readme(owner: str, repo: str) -> str | None:
-    """README 内容；文件不存在是正常场景（不是每个仓库都有 README），返回
-    None 而不是抛异常——调用方不该把"没有 README"当成运行时错误处理。
+async def read_file(owner: str, repo: str, path: str) -> str | None:
+    """任意单文件内容；文件不存在是正常场景，返回 None 而不是抛异常——调用方
+    不该把"文件不存在"当成运行时错误处理（B02 探测 package.json/pyproject.toml/
+    requirements.txt 时，大多数仓库大概率缺其中几个，属于预期路径）。
 
-    真实内容来自 _parse_result 从 EmbeddedResource 块里取出的字符串（见该
-    函数注释）；单文件请求下 result 就是纯文本，不是 dict。
+    真实踩过的坑（TASK-B02 实测时发现，反过来修了 B01）：请求一个根目录不存在
+    但仓库树里有相似路径的文件时，get_file_contents **不报错**（is_error=False），
+    而是返回一条纯 TextContent 提示消息（"Resolved potential matches in the
+    repository tree..."），没有 EmbeddedResource 块。旧实现把这条提示文本当成
+    了真实文件内容返回，导致下游把 "resolved potential matches..." 那句话的
+    首词解析成了一个假依赖包名 "resolved"。
+
+    修复：判定"是不是真实文件内容"的依据是**有没有 EmbeddedResource 块**，不
+    是匹配提示文本的具体措辞——后者更脆弱，GitHub 改一下文案就会失效。实测
+    确认：真实单文件内容永远带 EmbeddedResource，这条提示消息永远不带。
     """
     try:
-        result = await _call_tool("get_file_contents", {"owner": owner, "repo": repo, "path": "README.md"})
+        result = await _call_tool_raw("get_file_contents", {"owner": owner, "repo": repo, "path": path})
     except GitHubMCPRuntimeError:
         return None
-    if isinstance(result, dict):
-        return result.get("content") or result.get("text")
-    return str(result) if result else None
+    for block in result.content:
+        if isinstance(block, types.EmbeddedResource):
+            return getattr(block.resource, "text", None)
+    return None
+
+
+async def read_readme(owner: str, repo: str) -> str | None:
+    """README 内容——read_file 的一个具名快捷方式，语义更清楚。"""
+    return await read_file(owner, repo, "README.md")
 
 
 async def get_repo_languages(owner: str, repo: str) -> list[str]:

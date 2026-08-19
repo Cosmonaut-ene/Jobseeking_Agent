@@ -90,3 +90,19 @@
 - 自己封装 GitHub REST API 代替 MCP：SPEC 明确禁止（"不得自行封装 GitHub REST API，必须走 MCP server"，本 Task 的目的之一就是验证工具可插拔性）
 - 为 `get_repo_languages` 找不到直接工具就先跳过整个 B01：判断为不必要——其余功能齐全的工具（`get_me`/`search_repositories`/`get_file_contents`/`list_commits`）已经能覆盖 B02 大部分需求
 - 保留最初的目录+后缀名启发式方案：被真实数据证明有更准的替代（`.language` 字段），没有理由继续用精度更低的猜测方案
+
+---
+
+### DEC-07: TASK-B02 全量真实跑，反向发现并修复 B01 的一个隐藏数据错误 + 新增日期钳制
+
+**决策**：`read_file()`（B01）判定"是不是真实文件内容"的依据改成"有没有 `EmbeddedResource` 块"，不再信任 `_call_tool()` 解析出来的字符串本身；新增 `_call_tool_raw()` 暴露未解析的 `CallToolResult` 供 `read_file()` 使用。`profile_sync.py` 的 `_repo_activity_span()` 新增 `last_active = max(last_active, first_seen)` 钳制。
+
+**原因**：
+- 用真实 `GITHUB_TOKEN` 跑 `sync_profile()` 全账号（14 个仓库）时，输出里出现一个技能名叫 `resolved`，横跨 4 个仓库、`years=1.2`（全数据集里最长的技能跨度之一）——一看就不是真的依赖包名。追查发现：`get_file_contents` 请求一个仓库根目录不存在、但仓库树里有相似路径的文件时（比如根目录没有 `requirements.txt`，但 `backend/requirements.txt` 存在），**不返回错误**（`is_error=False`），而是返回一条纯 `TextContent` 提示消息：`"Resolved potential matches in the repository tree (resolved refs: {...}, matching files: [...])."`，**没有 `EmbeddedResource` 块**。`read_file()`（当时叫法，B01 就有这个函数）把这条提示消息当成了真实文件内容返回，`profile_sync.py` 的依赖文件解析器又把消息首词 "Resolved" 解析成了一个假的依赖包名。
+  - **这个 bug 从 B01 一开始就存在**，B01 自己的live验证（`scripts/verify_github_mcp.py`）之所以没测出来，纯粹是因为测试用的仓库根目录正好有真实 `README.md`，从没走到这条"路径不存在但有相似文件"的分支。B02 用不同的路径（`package.json`/`pyproject.toml`/`requirements.txt`，很多仓库根目录本来就没有）大量触发了这个分支，才暴露出来。
+  - 判定依据从"匹配提示文本的具体措辞"改成"有没有 `EmbeddedResource`"，是因为前者脆弱（GitHub 改一下文案就失效），后者是实测确认的结构性信号（真实单文件内容永远带 `EmbeddedResource`，这条提示消息永远不带）。
+- 同一次全量跑还发现 `Cosmonaut-ene/free-code` 仓库的 `first_seen`（仓库 `created_at`）晚于 `last_active`（最近一次 commit 的作者时间戳）——即"最近活跃日期比首次出现日期还早"。查证是真实场景：本地先攒一段 git 历史，之后才一次性 push 建库，commit 作者时间戳完全可以早于 GitHub 记录的仓库创建时间，不是数据损坏。不加钳制的话，报告里会出现自相矛盾的日期对，破坏"years 可回溯"这个 AC 的可信度。
+
+**被拒绝的方案**：
+- 只在 `profile_sync.py` 里过滤掉"看起来像提示消息"的内容（比如检测 "Resolved potential matches" 前缀）：判定逻辑应该属于 `github_client.py` 这一层（它更了解 GitHub MCP 工具的真实行为），不该让每个调用方各自猜测和过滤；而且字符串前缀匹配比 `EmbeddedResource` 结构检查脆弱
+- 丢弃 commit 时间戳早于 created_at 的仓库整条数据：没必要，钳制 `last_active` 下限就能让数字有意义，不需要整条丢弃
