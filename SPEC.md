@@ -2080,3 +2080,50 @@ _本附录为规划记录，非实现文档。进入开发前需按 CLAUDE.md �
 ---
 
 _本附录为规划记录，非实现文档。各 Task 的 AC 需经人工确认后方可进入开发；开发过程遵循 CLAUDE.md：一 Task 一 commit、分支命名 `feat/<module>/<desc>`、一分支一 PR、当前 PR 未合并不得开始下一 Task。_
+
+---
+
+## 附录 G：LLM Provider 迁移（Gemini → DeepSeek-V4）
+
+**规划日期**：2026-08-19
+**状态**：`planning` — 仅 G01 已拆分到可开发粒度，G02–G04 待 G01 结果验证后再拆
+**决策**：先迁移 `ResumeParser` 单点验证可行性，通过后逐个迁移其余 3 个 agent（`ScoutAgent` → `TailorAgent` → `CoverLetterAgent`），**不做大爆炸式整体替换**
+
+### G.0 范围与前提（未经验证，不得假设）
+
+> 按 CLAUDE.md「Never fill in API documentation links or versions；human 负责核实外部依赖有效性」，以下事项**必须由人工在开发前自行核实**，本 SPEC 不代为验证或假设结果：
+> - DeepSeek-V4 API 的 `response_format` / structured output 能力，能否等价替代 Gemini `types.Schema` 的 `required` 字段强制、嵌套 object、`enum` 约束
+> - 是否存在等价于 `response_mime_type="application/json"` 的强 JSON 输出保证，还是仅能靠 prompt 约束（若是后者，需重新评估 §8.6 类似的"输出不稳定"风险是否会在新 provider 上更严重）
+> - API 调用方式（SDK 还是 OpenAI 兼容 REST）、鉴权方式、速率限制
+
+**本次迁移不解决、不涉及**：
+- 迁移动机（成本 / 性能 / 其他）未明确记录，不影响本附录的技术拆分，但如涉及"是否要保留 Gemini 作为 fallback"这类产品决策，需另行确认
+- 是否引入 provider 抽象层（如 `LLMClient` 统一接口）——四个 agent 现状是各自独立持有 `genai.Client()` 实例，逐个迁移不强制要求先建抽象层。按 YAGNI 原则**暂不做**，若迁移到第二、第三个 agent 时发现重复样板代码明显，届时再补一层，不预先设计
+
+### TASK-G01：ResumeParser 迁移至 DeepSeek-V4（验证性 Task）
+
+- **目的**：用四个 agent 里 schema 最简单的一个（`PROFILE_SCHEMA`，无深层嵌套 enum 逻辑）做迁移可行性验证，其结果决定 G02–G04 是否继续、以及要不要调整迁移策略
+- **输入**：现有 `backend/app/agents/parser.py`；人工已核实的 DeepSeek-V4 API 文档（见 G.0，本 Task 开始前必须完成）
+- **输出**：
+  - 改造 `ResumeParser.__init__` 与 `parse_text()`/`parse_file()` 内部调用，替换为 DeepSeek-V4
+  - 新增环境变量 `DEEPSEEK_API_KEY`（写入 `.env.example`，不含真实值），`config.py` 新增对应读取
+  - **保留** `GEMINI_API_KEY` 及其读取逻辑不变——本 Task 只动 `ResumeParser` 一个 agent，其余三个仍用 Gemini，两个 key 需同时存在
+  - 产出一份迁移记录（追加进 `DECISIONS.md`）：记录 schema 约束能力的实测差异、是否需要额外的输出校验兜底（类比 `scout.py` 的 null 归一化经验）
+- **约束 / 不得做**：
+  - **不得**改动 `PROFILE_SCHEMA` 的字段定义本身（技能等级判定规则、years 推断规则等 prompt 设计保持不变），本 Task 只换底层调用，不做 prompt 层面的同步优化——避免"换模型"和"改 prompt"两件事混在一次改动里，出问题时无法定位是哪一层导致
+  - **不得**改动 `profile.py` 路由层对 `ResumeParser` 的调用方式（对外接口不变）
+  - 若发现 DeepSeek-V4 的结构化输出约束力明显弱于 Gemini（如无法保证 `required` 字段一定存在），**不得**跳过校验强行合并，必须在代码层补一层类似 `scout.py` 的 `or default` 兜底，并在 `DECISIONS.md` 中记录原因
+- **AC**：
+  - `POST /api/profile/upload-resume`、`POST /api/profile/parse-resume` 两个端点在切换后行为不变（返回结构与现状一致）
+  - 现有 `backend/tests/test_*.py` 中涉及 ResumeParser 的用例全部通过（mock 调整为 mock DeepSeek 客户端而非 Gemini）
+  - 新增至少 3 组真实简历文本的人工比对：DeepSeek 输出 vs 原 Gemini 输出，记录字段级差异（不要求完全一致，但需人工判断"是否可用"）
+  - `DECISIONS.md` 中新增一条记录，写明本次验证结论与是否建议继续 G02
+
+### TASK-G02 / G03 / G04：ScoutAgent / TailorAgent / CoverLetterAgent 迁移
+
+> **暂不拆分到 Task 粒度。** 待 G01 完成并给出结论后，根据实际发现的 API 差异（尤其是结构化输出约束力）重新评估这三个 agent 的迁移方案——`TailorAgent` 的 `TAILOR_SCHEMA` 含嵌套数组对象、`ScoutAgent` 的 `EVAL_SCHEMA` 是四个 agent 里最复杂的一个（5 段嵌套结构），二者的风险远高于 `ResumeParser`，不应在 G01 结果出来前预先假设方案。
+
+### G.5 与既有内容的关系
+
+- 与附录 F 相互独立，两条线可并行推进，无依赖关系
+- 若 G01 验证后发现 DeepSeek-V4 无法满足结构化约束，**回退方案**是保留 Gemini 现状，附录 G 到此为止——这不是失败，是这个 Task 存在的目的（用最小成本验证一个有风险的假设）
