@@ -1796,3 +1796,287 @@ Faker 虚拟数据生成脚本（一次性 / 可重跑）
   - 投递转化率 / 行业分布 / 响应时间趋势三个目标图表在 Tableau Public 上可见
 
 _本附录为规划记录，非实现文档。进入开发前需按 CLAUDE.md 流程重新走一遍 Interpretation Confirmation，并将各阶段拆成自包含的 TASK-XX（输入/输出/约束/禁止事项/AC）。_
+
+---
+
+## 附录 F：v3.0 升级方案（本地应用 + GitHub MCP + 确定性 ATS 模拟器）
+
+**规划日期**：2026-08-19
+**状态**：`planning` — 待人工确认 AC 后进入开发
+**关联**：本附录直接回应 §8.6「ATS 评分说明（重要限制）」中记录的方法论缺陷
+
+---
+
+### F.1 背景：这次升级要解决的真正问题
+
+§8.6 已明确记录现有评分的局限：`match_score` 是 **Gemini 主观估算**的"它认为 ATS 会怎么打分"，而非真实 ATS 解析结果。这带来一个根本性问题：
+
+> 该分数可能与"这份简历写得好不好"高度相关，但与"真实 ATS 会不会把它筛掉"**未必相关**。
+
+真实 ATS 淘汰简历的两个高频原因，LLM 打分**结构上无法覆盖**：
+
+| 真实失败模式 | LLM 为何看不见 |
+|---|---|
+| **解析失败** — 表格、多栏、图标、页眉页脚放联系方式，导致解析器读出乱码或空白 | 模型看到的是已渲染好的文本，不是"这份 PDF 被笨拙解析器读完会变成什么样" |
+| **字面关键词匹配** — JD 写 `Kubernetes`、简历写 `K8s`，字符串级匹配直接 miss | 模型的语义理解会认为"这明显是同一个东西"，从而高估命中率 |
+
+**因此 v3.0 的核心不是"让 LLM 打分更准"，而是新增一套完全不依赖 LLM 的确定性评估（模块 C），与现有 LLM 定性分析并列存在、互相校验。** 这是本次升级中唯一决定"项目是否真正有效"的模块，其余模块为配套的形态与数据源升级。
+
+---
+
+### F.2 被拒绝的方案（Rejected Approaches）
+
+> 以下方案在需求讨论中被明确拒绝，**不得在后续开发中重新引入**。
+
+| 方案 | 拒绝理由 |
+|---|---|
+| **Agent 自主投递申请** | LinkedIn / Seek 服务条款明确禁止自动化投递，触发风控轻则限流重则封号。且投递是**不可逆的外部动作**，后果直接落在用户真实求职声誉上。改为：系统批量推送「岗位 + 已定制简历」，由人类在平台上自行提交 |
+| **邮箱监听自动更新投递状态**（IMAP / Gmail API） | 用户明确表示暂不接受将邮箱访问权交给 agent。投递结果追踪仅保留「人类零摩擦确认」一层 |
+| **提升 LLM 打分准确度以解决 ATS 评分问题** | 治标不治本。LLM 无论如何优化都无法评估"排版解析风险"与"字面匹配率"，这是模型输入形态决定的结构性盲区，只能由确定性模块补足 |
+| **对系统生成的 PDF/DOCX 做解析度校验** | 文件生成模块因产出排版质量不达投递标准已被搁置（见 F.3 依赖冲突说明）。若以其产出为校验对象，模块 C 将被搁置模块阻塞。改为校验**用户实际上传/投递的简历文件** |
+| **用 embedding / 语义相似度做关键词匹配** | 与本模块目的直接矛盾。模块 C 的价值恰恰在于模拟"真实 ATS 的字符串级匹配"，引入语义相似度会退化成又一个"LLM 式的宽容判断"，失去与 LLM 分数对照的意义 |
+| **定时自动抓取（APScheduler 每日 9:00 触发，F-08）** | 桌面应用形态下需常驻托盘进程才能成立，为一个非核心功能引入常驻进程的复杂度与用户心智负担不划算。**全面改为用户手动开启抓取**。相关的 `SCHEDULER_*` 环境变量、`backend/app/scheduler.py` 一并移除 |
+| **Snowflake 星型模型 / Tableau Public 发布（附录 E TASK-D04/D05）** | 用户暂无能力维护，且 Snowflake 试用窗口有限。该线整体搁置，不在 v3.0 范围内 |
+| **文件生成（PDF/DOCX）排版质量打磨** | 主动搁置。当前产出不符合"可直接投递"标准，但优先级低于 ATS 评分有效性 |
+
+---
+
+### F.3 已识别的依赖冲突（进入开发前必须确认）
+
+| # | 冲突 | 处置 |
+|---|---|---|
+| F-CONF-01 | 模块 C 的解析度校验需要一份 PDF/DOCX 作为输入，而文件生成模块已搁置 | **校验对象改为用户上传的简历文件**（`data/resumes/` 下用户原始上传件）。既解耦搁置模块，也更贴近真实场景——校验的是真正会被 ATS 读到的那个文件 |
+| F-CONF-02 | 模块 A 桌面化后为「用户点开才跑」，而 F-08「每日 9:00 自动抓取」依赖 APScheduler 进程常驻 | **已决策（2026-08-19）：舍弃定时抓取，全面改为用户手动开启。** 不做托盘常驻。由 TASK-A01 执行移除，该 Task 独立于打包工作，可提前单独实施。附带收益：消除「两个同名 `scheduler.py`」的既有技术债 |
+| F-CONF-03 | 模块 B 的 GitHub 技能推断会写入 `UserProfile`，与现有 `Resume.tsx` 增量合并逻辑存在重叠 | 复用现有合并规则（years 取大值、按 key 去重、占位符不覆盖），**不得新写一套合并逻辑** |
+
+---
+
+### F.4 架构变更总览
+
+```
+形态变更：Web 服务（公网可达 + 常驻定时任务）  →  本地桌面应用（单机 + 全手动触发）
+  副作用 1：§8.3 安全性中「无鉴权」风险项随之消解——不再有公网暴露面
+  副作用 2：APScheduler 整条链路移除，「两个同名 scheduler.py」技术债一并消除
+
+数据源新增：GitHub MCP  →  ProfileSyncAgent  →  (diff 提议) → 人工确认 → UserProfile
+
+评分体系（核心变更）：
+  现状：Gemini ats_pct  ──────────────────────────▶  match_score（单一主观分数）
+
+  v3.0：Gemini ats_pct        ──▶ 定性分析（保留，仍用于 5 段评估报告）
+        ATSSimulator（新增）  ──▶ deterministic_ats_score（确定性、可复现）
+                                    ├── parseability_score  解析度
+                                    └── keyword_match_score 字面命中率
+        两分数并列展示 + 差异解读（差异本身即为最有价值的洞察）
+
+投递闭环：批量推送（岗位+已定制简历） → 人类平台自行提交 → 消息内一键确认 → Application 状态机
+```
+
+---
+
+### F.5 模块 C：确定性 ATS 模拟器 【P0 · 核心】
+
+**目标**：新增 `backend/app/ats/` 子包，提供完全不依赖 LLM、可复现、可单元测试的 ATS 模拟评分，补足 §8.6 记录的方法论缺陷。
+
+#### TASK-C01：解析度校验器（parseability checker）
+
+- **输入**：用户上传的简历文件路径（`data/resumes/` 下 PDF/DOCX），及其经 `ResumeParser` 得到的结构化 `UserProfile`
+- **输出**：新建 `backend/app/ats/parseability.py`，导出 `check_parseability(file_path, expected_profile) -> ParseabilityReport`
+  - `ParseabilityReport`：`score`(0-100)、`extracted_char_count`、`missing_fields`(list)、`warnings`(list[str]，如"检测到多栏排版，联系方式可能位于页眉")
+- **实现要点**：复用现有 `ResumeParser._extract_pdf` / `_extract_docx` 重新抽取纯文本，与 `expected_profile` 中的关键字段（姓名、各项技能名、公司名、学校名）逐一比对，统计**抽取后仍能找到**的比例
+- **约束 / 不得做**：
+  - 纯确定性，**不得调用任何 LLM**
+  - **不得**以系统生成的 PDF/DOCX 为校验对象（见 F-CONF-01）
+  - 不得引入新的 PDF 解析库，复用现有 `pypdf` / `python-docx`
+- **AC**：
+  - 同一文件重复调用 10 次，`score` 完全一致（确定性验证）
+  - 给定一份多栏/表格排版的简历样本，能检出字段丢失并产生 warning
+  - 给定一份单栏纯文本简历，`score ≥ 90`
+  - 新增 pytest 覆盖：正常 PDF、正常 DOCX、损坏文件、字段全丢失四种情况
+
+#### TASK-C02：字面关键词匹配引擎
+
+- **输入**：JD 原文、简历纯文本、Scout 已产出的 `gap_analysis.resume_improvements.ats_keywords`
+- **输出**：新建 `backend/app/ats/keyword_match.py`，导出 `match_keywords(jd_text, resume_text, keywords) -> KeywordMatchReport`
+  - 报告含：`score`(命中率 %)、`hits`(list)、`misses`(list)、`alias_hits`(list[tuple]，记录经别名表命中的项)
+  - 同时新建可配置别名表 `backend/app/ats/aliases.py`（如 `K8s↔Kubernetes`、`JS↔JavaScript`、`ML↔Machine Learning`）
+- **约束 / 不得做**：
+  - **严禁使用 embedding / 语义相似度 / LLM 判断**——本模块的全部价值在于模拟真实 ATS 的字符串级匹配（见 F.2）
+  - 匹配需大小写不敏感、处理词边界（`Java` 不得命中 `JavaScript`）
+  - 别名表必须是独立可维护的数据文件，不得散落在匹配逻辑中
+- **AC**：
+  - `Kubernetes`(JD) vs `K8s`(简历) 经别名表命中，并在 `alias_hits` 中标注
+  - `Java`(JD) vs 仅含 `JavaScript` 的简历 → 判定为 miss（词边界验证）
+  - 同输入重复调用结果完全一致
+  - 新增 pytest 覆盖：精确命中、别名命中、词边界误命中、空关键词列表
+
+#### TASK-C03：综合报告与双分数对照展示
+
+- **输入**：C01 与 C02 的输出
+- **输出**：
+  - `backend/app/ats/simulator.py`：`simulate_ats(...)` 聚合两项得出 `deterministic_ats_score`
+  - 数据模型新增字段：`ResumeVersion.deterministic_ats_score`(float)、`ResumeVersion.ats_report`(JSON)
+  - 新增端点 `POST /api/ats/simulate`
+  - 前端在展示 `match_score` 处**并列**展示两个分数及差异解读文案
+- **约束 / 不得做**：
+  - **不得**用确定性分数覆盖或替换现有 `match_score`，两者并存、各自标注来源
+  - 差异解读文案须具体可执行（如"字面关键词覆盖率仅 42%，建议在技能区补充 JD 原词"），不得输出"分数偏低"这类无信息量文案
+  - §8.6 要求的"AI 估算，仅供参考"标注对 LLM 分数**继续保留**
+- **AC**：
+  - 同一 (简历, JD) 组合，`deterministic_ats_score` 可复现
+  - 前端能同时看到两个分数；当差值 > 20 时展示差异解读
+  - 新增 pytest 覆盖端点 happy path + 简历文件缺失的错误路径
+
+#### TASK-C04：将确定性分数接入 Tailor 闭环（Evaluator-Optimizer）
+
+- **输入**：TailorAgent 当前输出 + C03 的确定性评分
+- **输出**：改造 `TailorAgent.run()`，形成有界迭代：生成 → 确定性评分 → 若低于阈值则携带 `misses` 反馈重写 → 重新评分
+- **约束 / 不得做**：
+  - **必须有硬性最大迭代次数**（默认 2，可配置），达上限即返回当前最佳版本，**不得无限循环**
+  - 反馈信号使用**确定性分数**，不得再用 `_eval_ats_score` 的 LLM 自评来驱动重写决策（避免"用一个模型的主观判断评估另一个模型的主观判断"）
+  - 每轮版本均须落库保留，**不得覆盖**历史 `ResumeVersion`
+  - 现有 `_validate_bullets` 数字幻觉校验必须在每一轮都执行，不得因迭代而跳过
+- **AC**：
+  - 迭代次数达上限时正常返回，日志记录实际轮数
+  - 迭代后 `deterministic_ats_score` 不低于首轮（若低于则返回首轮版本）
+  - 数据库中可查到同一 job 的多个版本及各自分数
+  - 新增 pytest：mock 掉 LLM 调用，验证迭代次数上限与"取最优版本"逻辑
+
+---
+
+### F.6 模块 D：投递追踪闭环（人工确认层）【P0】
+
+**目标**：修复 `Application.status` 死字段（现状：创建后恒为 `pending`，导致 §2.6 F-56 申请回复率统计永远输出 0%），建立「批量推送 → 人类平台自行提交 → 零摩擦确认」闭环。
+
+#### TASK-D01：Application 状态机接通
+
+- **输入**：现有 `Application` 模型
+- **输出**：将 `status` 由自由字符串改为枚举 `ApplicationStatus`：`ready`(AI 已备好) → `applied`(人类已投递) → `responded` / `interview` / `rejected`；新增 `PUT /api/applications/{id}/status`
+- **约束 / 不得做**：
+  - 需处理存量数据迁移（现有 `"pending"` 记录映射为 `ready`）
+  - **不得**引入任何自动推断状态的逻辑（邮箱监听已被拒绝，见 F.2）
+  - 修正 `dashboard.py` 中基于该字段的 `response_rate` 统计，使其反映真实数据
+- **AC**：
+  - 状态流转可通过 API 完成，非法流转返回 4xx
+  - `GET /api/dashboard/advisor` 的 `response_rate` 在有数据时不再恒为 0%
+  - 新增 pytest 覆盖：正常流转、非法流转、存量数据迁移
+
+#### TASK-D02：批量推送与零摩擦确认
+
+- **输入**：状态为 `ready` 的 Application 集合
+- **输出**：批量推送消息（含岗位、匹配分数、已定制简历下载入口）；推送消息内提供一键「✅ 已投递 / ⏭ 跳过」交互，回调直接更新状态
+- **约束 / 不得做**：
+  - **不得**实现任何形式的自动提交（见 F.2）
+  - 确认动作必须可在消息端完成，**不得要求用户返回应用内操作**（摩擦成本是本 Task 成败关键）
+  - 复用现有 `notifications.py` 的 webhook 双格式适配，不得新起一套推送通道
+- **AC**：
+  - 推送消息含岗位、分数、简历入口三要素
+  - 点击确认后 Application 状态实际变更，可在 Dashboard 查得
+  - webhook 未配置时降级为应用内列表展示，不报错
+
+---
+
+### F.7 模块 B：GitHub MCP 档案同步 【P1】
+
+**目标**：将 §9 v3.0 愿景中「作品集集成 — 自动将 GitHub 项目关联到技能和经历」落地，使 `UserProfile` 从纯手工维护变为可被动同步。
+
+#### TASK-B01：GitHub MCP 客户端接入
+
+- **输入**：GitHub 官方 MCP server；用户 GitHub token（环境变量，写入 `.env.example` 但不得含真实值）
+- **输出**：新建 `backend/app/mcp/github_client.py`，封装 `list_repos` / `get_repo_languages` / `get_recent_commits` / `read_readme` 四项调用
+- **约束 / 不得做**：
+  - **不得**自行封装 GitHub REST API，必须走 MCP server（本 Task 的目的之一即验证工具可插拔性）
+  - token 只能来自环境变量，不得硬编码或提交
+  - 只读，不得有任何写 GitHub 的操作
+- **AC**：四项调用均可返回真实数据；token 缺失时返回明确 4xx 而非 500
+
+#### TASK-B02：技术栈与活跃时长推断
+
+- **输入**：B01 的仓库数据
+- **输出**：`backend/app/agents/profile_sync.py`，从语言统计 + 依赖文件（`package.json`/`pyproject.toml`/`requirements.txt`）推断技术栈；从 commit 时间跨度反推各技术的**活跃使用时长**
+- **约束 / 不得做**：
+  - 技能 `years` 必须优先采用 **commit 时间戳推算的客观值**，不得沿用 `ResumeParser` 中 LLM 主观估计的方式（该字段现状为模型脑补，本 Task 即为校正它）
+  - fork 的仓库默认排除，可配置
+- **AC**：给定一个真实账号，产出的技术栈列表与实际仓库语言分布一致；`years` 有 commit 时间跨度作为依据，可在报告中回溯
+
+#### TASK-B03：diff 提议与人工确认合并
+
+- **输入**：B02 推断结果 + 现有 `UserProfile`
+- **输出**：产出**变更提议 diff**（新增技能 / years 变化 / 新增项目），前端展示后由人类逐项确认合并
+- **约束 / 不得做**：
+  - **严禁自动覆盖 `UserProfile`**——必须人工确认，与项目既有人机边界保持一致
+  - 合并规则复用 `Resume.tsx` 现有逻辑（years 取大值、按 key 去重、占位符不覆盖），**不得新写一套**（见 F-CONF-03）
+- **AC**：diff 可视、可逐项接受/拒绝；拒绝的项不写入；手动编辑过的字段不被静默覆盖
+
+---
+
+### F.8 模块 A：本地桌面应用打包 【P2】
+
+**目标**：形态由「Web 服务 + 常驻定时任务」改为「单机桌面应用 + 全手动触发」。副作用：§8.3 中「22 个端点全部无鉴权 + 公网部署」的风险项随公网暴露面消失而消解。
+
+#### TASK-A01：移除定时调度，全面改为手动触发 【优先级 P1，独立于打包，可提前实施】
+
+- **输入**：现有 `backend/app/scheduler.py`（APScheduler 包装）、`backend/app/scrapers/scheduler.py`（业务逻辑 `run_daily_scout()`）
+- **输出**：
+  - 删除 `backend/app/scheduler.py`；`main.py` 的 `lifespan` 中移除 `start_scheduler()` / `stop_scheduler()` 调用
+  - **保留** `run_daily_scout()` 业务逻辑，但重命名以消除语义误导（建议 `scrapers/scheduler.py` → `scrapers/batch_scrape.py`，`run_daily_scout()` → `run_batch_scrape()`）
+  - 移除 `SCHEDULER_ENABLED` / `SCHEDULER_HOUR` / `SCHEDULER_MINUTE` 三个环境变量及 `config.py` 中对应常量；同步清理 `.env.example`、`render.yaml`、README
+  - 前端 Settings 页移除调度时间配置项；Notifications 页的「手动触发」入口保留并提升为主入口
+- **约束 / 不得做**：
+  - **不得**删除 `run_daily_scout()` 的业务逻辑本身——它仍是「一次跑完 Seek + LinkedIn 并汇总」的有效入口，仅调用方式由定时改为手动
+  - **不得**保留任何形式的常驻后台调度（含托盘常驻、系统级 cron 注册）
+  - `push_daily_summary()` 保留，但语义由「每日定时摘要」改为「本次批量抓取完成摘要」，函数名与文案需同步调整
+  - 移除 `apscheduler` 依赖前须确认无其他引用
+- **AC**：
+  - 全局搜索无 `apscheduler` / `SCHEDULER_` 残留
+  - 应用启动后不再有任何后台定时任务，日志中无调度器相关输出
+  - 手动触发批量抓取功能完整可用，抓取结束后推送摘要
+  - 现有测试全部通过；涉及调度的测试相应移除或改写
+
+#### TASK-A02：pywebview 应用外壳
+
+- **输出**：`desktop/main.py` — 启动本地 FastAPI 进程并以原生窗口加载，不经由系统浏览器
+- **约束**：不得引入 Node/Rust 工具链（已评估 Tauri：需将 PyInstaller 产物作为 sidecar，多一套构建流程，投入产出比不足）
+- **AC**：双击启动后出现原生窗口，全部页面功能与浏览器访问一致
+
+#### TASK-A03：PyInstaller 打包与 Playwright 引导
+
+- **输出**：单文件可执行程序构建脚本；首次启动时以进度界面引导下载 Chromium 组件
+- **约束 / 不得做**：
+  - **不得**将 Chromium 二进制直接打进产物（体积不可接受）
+  - **不得**假设最终用户会自行执行 `playwright install chromium` 命令行
+- **AC**：在无 Python 环境的干净机器上可运行；首启动能完成浏览器组件引导；引导失败时抓取功能优雅降级而非崩溃
+
+> 原「TASK-A03：调度模型决策」已因 F-CONF-02 于 2026-08-19 决策完毕而取消，其执行内容并入 TASK-A01。
+
+---
+
+### F.9 开发时序与优先级
+
+| 阶段 | Task | 优先级 | 说明 |
+|---|---|---|---|
+| 1 | C01 → C02 | **P0** | 两者独立，可并行；构成确定性评分基座 |
+| 2 | C03 | **P0** | 依赖 C01+C02 |
+| 3 | D01 → D02 | **P0** | 独立于 C，可与阶段 1-2 并行；修复既有死字段 |
+| 4 | C04 | P1 | 依赖 C03 |
+| 5 | **A01** | **P1** | **移除定时调度。独立于其余所有 Task，随时可插入执行**；建议尽早做，可消除既有技术债并简化后续打包 |
+| 6 | B01 → B02 → B03 | P1 | 严格串行 |
+| 7 | A02 → A03 | P2 | 桌面打包，建议在功能稳定后进行 |
+
+**建议起点**：C01 + C02。二者是整个 v3.0 价值主张的地基，且完全不依赖任何被搁置模块，可独立验证成效。
+**可并行的低成本收尾**：A01 与 D01 均为独立的「清理既有技术债」型 Task，可在主线开发的任意间隙插入。
+
+---
+
+### F.10 与既有章节的关系
+
+- **§8.6 ATS 评分说明（重要限制）**：本附录 F.5 即为该限制的解决方案。待模块 C 合并后，需按 CLAUDE.md 流程以独立 commit 更新 §8.6，补充确定性评分的说明——**在功能完成前不得预先修改该节**
+- **§9 v3.0 长期愿景**："作品集集成"由模块 B 落地；"多用户支持/云端托管"与模块 A 的单机形态方向相反，需在 v3.0 完成后重新评估
+- **§2.1 F-08（每日自动抓取）**：因 F-CONF-02 决策已废止，待 TASK-A01 合并后须以独立 commit 将其状态改为「❌ 已移除（改为手动触发）」——**功能完成前不得预先修改**
+- **§2.5 F-42（每日摘要推送）**：语义变更为「批量抓取完成摘要」，随 TASK-A01 一并更新
+- **§4.6 后台任务模式**、**§10.2 环境变量**：均含 APScheduler / `SCHEDULER_*` 描述，随 TASK-A01 更新
+- **附录 E（Analytics/Snowflake）**：整体搁置，不在 v3.0 范围内
+
+---
+
+_本附录为规划记录，非实现文档。各 Task 的 AC 需经人工确认后方可进入开发；开发过程遵循 CLAUDE.md：一 Task 一 commit、分支命名 `feat/<module>/<desc>`、一分支一 PR、当前 PR 未合并不得开始下一 Task。_
