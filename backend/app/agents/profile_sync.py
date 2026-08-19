@@ -1,11 +1,11 @@
-"""Profile Sync Agent — SPEC 附录 F.7 TASK-B02.
+"""Profile Sync Agent — SPEC 附录 F.7 TASK-B02 + TASK-B03.
 
-Infers a candidate's tech stack and how long they've used each
-technology from real GitHub activity — repo languages (via
-backend.app.mcp.github_client.get_repo_languages) plus dependency-file
-parsing (package.json / pyproject.toml / requirements.txt) for *what*,
-and repo creation + real commit timestamps for *how long* — not an LLM
-guess.
+TASK-B02 (sync_profile): infers a candidate's tech stack and how long
+they've used each technology from real GitHub activity — repo
+languages (via backend.app.mcp.github_client.get_repo_languages) plus
+dependency-file parsing (package.json / pyproject.toml /
+requirements.txt) for *what*, and repo creation + real commit
+timestamps for *how long* — not an LLM guess.
 
 This directly corrects a known issue in ResumeParser: its `years`
 field is model-estimated from resume prose with no ground truth (see
@@ -13,19 +13,29 @@ its PARSE_SYSTEM prompt). Here `years` is derived from objective
 GitHub timestamps, and every inferred skill keeps first_seen /
 last_active / source_repos so the number is traceable, not a black box.
 
-This module only *infers* — it never writes to UserProfile. TASK-B03
-(diff proposal + human-confirmed merge) is what actually touches the
-profile.
+TASK-B03 (build_skill_diff / apply_skill_diff): turns B02's inference
+into a reviewable diff against the existing UserProfile.skills, and
+applies only the entries a human explicitly accepted. The merge rule
+(key by lowercased name, years only ever goes up) is the exact same
+rule frontend/src/pages/Resume.tsx's mergeSkills() already uses for
+incremental resume-paste merges — re-implemented here in Python with
+identical semantics, not a second, different merge policy (SPEC
+F-CONF-03: "不得新写一套"). Nothing in this module writes to
+UserProfile directly — sync_profile()/build_skill_diff() only infer
+and propose; a router endpoint calls apply_skill_diff() only after a
+human has picked which entries to accept.
 """
 from __future__ import annotations
 
 import json
 import re
 from datetime import datetime, timezone
+from typing import Literal
 
 from pydantic import BaseModel
 
 from backend.app.mcp import github_client as gc
+from backend.app.models.user_profile import Skill
 
 _DEPENDENCY_FILES = ("package.json", "pyproject.toml", "requirements.txt")
 
@@ -186,3 +196,104 @@ def _build_inferred_skill(name: str, observations: list[tuple[str, datetime, dat
         first_seen=first_seen.date().isoformat(),
         last_active=last_active.date().isoformat(),
     )
+
+
+# ── TASK-B03: diff proposal + human-confirmed merge ──────────────────────────
+
+# 复用 ResumeParser 系统提示词里同样的 years -> level 判定阈值（beginner < 1y,
+# intermediate 1-3y, expert 3y+），不新发明一套——GitHub 数据只给得出 years，
+# 给不出"是不是被列为主要强项"这种主观信号，所以新技能的 level 只能从 years
+# 反推，用项目里已经确立的同一套边界，保持内部一致。
+def _infer_level_from_years(years: float) -> str:
+    if years >= 3:
+        return "expert"
+    if years >= 1:
+        return "intermediate"
+    return "beginner"
+
+
+class SkillDiffEntry(BaseModel):
+    """一条待人工确认的技能变更提议。change_type 只有两种，因为 mergeSkills
+    的规则本身只支持这两种变更：新增技能，或已有技能的 years 往上调——years
+    变小的推断结果不会产生 diff 条目（按 Resume.tsx 的既有规则，years 只增不
+    减，没有变更可提）。"""
+    name: str
+    change_type: Literal["new", "years_increase"]
+    proposed_years: float
+    current_years: float | None = None  # "new" 时为 None
+    source_repos: list[str]
+    first_seen: str
+    last_active: str
+
+
+def build_skill_diff(existing_skills: list[Skill], inferred: list[InferredSkill]) -> list[SkillDiffEntry]:
+    """把 B02 的推断结果对照现有 UserProfile.skills，算出"值得提议"的变更。
+
+    合并键与 years 比较规则跟 Resume.tsx::mergeSkills 完全一致：按
+    name.lower() 匹配，只有推断值严格大于现有值才算变更。不产出 years 相等
+    或更小的条目——那种情况下 mergeSkills 的规则本来就不会改变现有数据，
+    提议出来只会让人误以为有什么可确认的。
+    """
+    existing_map = {s.name.lower(): s for s in existing_skills}
+    diffs: list[SkillDiffEntry] = []
+    for skill in inferred:
+        key = skill.name.lower()
+        existing = existing_map.get(key)
+        if existing is None:
+            diffs.append(SkillDiffEntry(
+                name=skill.name,
+                change_type="new",
+                proposed_years=skill.years,
+                current_years=None,
+                source_repos=skill.source_repos,
+                first_seen=skill.first_seen,
+                last_active=skill.last_active,
+            ))
+        elif skill.years > existing.years:
+            diffs.append(SkillDiffEntry(
+                name=skill.name,
+                change_type="years_increase",
+                proposed_years=skill.years,
+                current_years=existing.years,
+                source_repos=skill.source_repos,
+                first_seen=skill.first_seen,
+                last_active=skill.last_active,
+            ))
+    return diffs
+
+
+def apply_skill_diff(
+    existing_skills: list[Skill], diff_entries: list[SkillDiffEntry], accepted_names: set[str]
+) -> list[Skill]:
+    """只合并人工接受的条目，规则同 mergeSkills：key=name.lower()，
+    years=max(现有, 提议)。手动编辑过的字段（level、非 years 部分）不被
+    静默覆盖——已有技能只更新 years，level 保持用户原有设置不动；只有全新
+    技能才需要从 years 反推一个 level（见 _infer_level_from_years）。
+
+    accepted_names 按大小写不敏感匹配（用户在前端勾选时看到的是原始大小写
+    的技能名，这里统一转小写比较，避免"React" vs "react"被当成两个不同的
+    技能而漏合并）。
+    """
+    accepted_keys = {name.lower() for name in accepted_names}
+    existing_map = {s.name.lower(): s for s in existing_skills}
+
+    for entry in diff_entries:
+        key = entry.name.lower()
+        if key not in accepted_keys:
+            continue
+
+        current = existing_map.get(key)
+        if current is not None:
+            existing_map[key] = Skill(
+                name=current.name,
+                level=current.level,
+                years=max(current.years, entry.proposed_years),
+            )
+        else:
+            existing_map[key] = Skill(
+                name=entry.name,
+                level=_infer_level_from_years(entry.proposed_years),
+                years=entry.proposed_years,
+            )
+
+    return list(existing_map.values())

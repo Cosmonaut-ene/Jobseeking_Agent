@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api/client'
-import type { Education, Experience, Preferences, Project, Skill, UserProfile } from '../api/client'
+import { Github, Loader2 } from 'lucide-react'
+import { api, startGithubSync, getGithubSyncTask, applyGithubSync } from '../api/client'
+import type { Education, Experience, Preferences, Project, Skill, SkillDiffEntry, UserProfile } from '../api/client'
 import { useT } from '../contexts/LanguageContext'
 
 const EMPTY_PROFILE: UserProfile = {
@@ -151,6 +152,146 @@ function BasicTab({ profile, onChange }: { profile: UserProfile; onChange: (p: U
   )
 }
 
+// ── GitHub sync panel (SPEC 附录 F.7 TASK-B03) ─────────────────────────────────
+// diff 提议 -> 人工逐项勾选 -> 提交给后端 apply（后端已经按 mergeSkills 同一套规则
+// 合并并落盘）；这里 onApplied 只是把返回的最新 skills 同步进本组件的本地状态，
+// 不在前端重新做一遍合并——避免出现"前端一套合并逻辑、后端另一套"的分裂。
+function GitHubSyncPanel({ onApplied }: { onApplied: (skills: Skill[]) => void }) {
+  const t = useT()
+  const [syncing, setSyncing] = useState(false)
+  const [taskId, setTaskId] = useState<string | null>(null)
+  const [progress, setProgress] = useState('')
+  const [diff, setDiff] = useState<SkillDiffEntry[] | null>(null)
+  const [accepted, setAccepted] = useState<Set<string>>(new Set())
+  const [error, setError] = useState('')
+  const [applying, setApplying] = useState(false)
+  const [applyMsg, setApplyMsg] = useState('')
+
+  async function startSync() {
+    setSyncing(true); setError(''); setDiff(null); setApplyMsg('')
+    try {
+      const { task_id } = await startGithubSync()
+      setTaskId(task_id)
+      poll(task_id)
+    } catch (e: unknown) {
+      setError((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? t('github_sync_start_failed'))
+      setSyncing(false)
+    }
+  }
+
+  async function poll(id: string) {
+    try {
+      const task = await getGithubSyncTask(id)
+      setProgress(task.progress)
+      if (task.status === 'done') {
+        setDiff(task.diff ?? [])
+        setAccepted(new Set())
+        setSyncing(false)
+      } else if (task.status === 'error') {
+        setError(task.error ?? t('github_sync_start_failed'))
+        setSyncing(false)
+      } else {
+        setTimeout(() => poll(id), 3000)
+      }
+    } catch {
+      setError(t('github_sync_start_failed'))
+      setSyncing(false)
+    }
+  }
+
+  function toggle(name: string) {
+    setAccepted((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name); else next.add(name)
+      return next
+    })
+  }
+
+  async function applySelected() {
+    if (!taskId || accepted.size === 0) return
+    setApplying(true); setApplyMsg('')
+    try {
+      const result = await applyGithubSync(taskId, Array.from(accepted))
+      onApplied(result.profile.skills)
+      setApplyMsg(`${t('github_sync_applied_prefix')} ${accepted.size}`)
+      setDiff((prev) => (prev ?? []).filter((d) => !accepted.has(d.name)))
+      setAccepted(new Set())
+    } catch (e: unknown) {
+      setApplyMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? t('github_sync_apply_failed'))
+    } finally {
+      setApplying(false)
+    }
+  }
+
+  return (
+    <div className="glass-card p-4 mb-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t('github_sync_title')}</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t('github_sync_desc')}</p>
+        </div>
+        <button
+          onClick={startSync}
+          disabled={syncing}
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+        >
+          {syncing ? <Loader2 size={13} className="animate-spin" /> : <Github size={13} />}
+          {syncing ? (progress || t('github_sync_running')) : t('github_sync_btn')}
+        </button>
+      </div>
+
+      {error && <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>}
+
+      {diff && diff.length === 0 && (
+        <p className="text-xs text-slate-400 dark:text-zinc-500">{t('github_sync_no_changes')}</p>
+      )}
+
+      {diff && diff.length > 0 && (
+        <div className="space-y-2 border-t border-slate-200/60 dark:border-zinc-700/60 pt-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-500 dark:text-slate-400">{t('github_sync_diff_hint')}</span>
+            <button
+              onClick={() => setAccepted(new Set(diff.map((d) => d.name)))}
+              className="text-xs text-amber-600 dark:text-amber-400 hover:underline"
+            >
+              {t('github_sync_select_all')}
+            </button>
+          </div>
+          <ul className="space-y-1.5 max-h-64 overflow-y-auto">
+            {diff.map((d) => (
+              <li key={d.name} className="flex items-start gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={accepted.has(d.name)}
+                  onChange={() => toggle(d.name)}
+                  className="mt-0.5 w-3.5 h-3.5 accent-amber-500 rounded"
+                />
+                <div>
+                  <span className="font-medium text-slate-700 dark:text-slate-200">{d.name}</span>{' '}
+                  {d.change_type === 'new' ? (
+                    <span className="text-emerald-600 dark:text-emerald-400">{t('github_sync_new_skill')} · {d.proposed_years}y</span>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400">{d.current_years}y → {d.proposed_years}y</span>
+                  )}
+                  <span className="text-slate-400 dark:text-zinc-500 ml-1">· {d.source_repos.length} repo(s)</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={applySelected}
+            disabled={applying || accepted.size === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition-colors"
+          >
+            {applying ? t('github_sync_applying') : `${t('github_sync_apply_btn')} (${accepted.size})`}
+          </button>
+          {applyMsg && <p className="text-xs text-emerald-600 dark:text-emerald-400">{applyMsg}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Skills tab ───────────────────────────────────────────────────────────────
 function SkillsTab({ skills, onChange }: { skills: Skill[]; onChange: (s: Skill[]) => void }) {
   const t = useT()
@@ -166,6 +307,7 @@ function SkillsTab({ skills, onChange }: { skills: Skill[]; onChange: (s: Skill[
 
   return (
     <div className="space-y-3">
+      <GitHubSyncPanel onApplied={onChange} />
       <table className="w-full text-sm">
         <thead className="bg-slate-50/60 dark:bg-zinc-800/60">
           <tr>
