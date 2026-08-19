@@ -12,13 +12,11 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
 
-  // Notification / Scheduler settings
+  // Notification settings
   const [webhookUrl, setWebhookUrl] = useState('')
   const [chatId, setChatId] = useState('')
   const [highScoreThreshold, setHighScoreThreshold] = useState('0.80')
   const [midScoreThreshold, setMidScoreThreshold] = useState('0.70')
-  const [schedulerEnabled, setSchedulerEnabled] = useState(false)
-  const [schedulerHour, setSchedulerHour] = useState('9')
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsMsg, setSettingsMsg] = useState('')
 
@@ -33,8 +31,6 @@ export default function Settings() {
       if (d.notification_chat_id) setChatId(d.notification_chat_id)
       if (d.high_score_threshold !== undefined) setHighScoreThreshold(String(d.high_score_threshold))
       if (d.mid_score_threshold !== undefined) setMidScoreThreshold(String(d.mid_score_threshold))
-      if (d.scheduler_enabled !== undefined) setSchedulerEnabled(d.scheduler_enabled)
-      if (d.scheduler_hour !== undefined) setSchedulerHour(String(d.scheduler_hour))
     }).catch(() => {})
   }, [])
 
@@ -70,8 +66,6 @@ export default function Settings() {
         notification_chat_id: chatId || undefined,
         high_score_threshold: parseFloat(highScoreThreshold),
         mid_score_threshold: parseFloat(midScoreThreshold),
-        scheduler_enabled: schedulerEnabled,
-        scheduler_hour: parseInt(schedulerHour, 10),
       })
       setSettingsMsg(t('settings_saved'))
     } catch (e: unknown) {
@@ -145,7 +139,7 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Notifications & Scheduler */}
+      {/* Notifications */}
       <div className="glass-card p-6 space-y-4">
         <h2 className="text-base font-semibold text-slate-700 dark:text-slate-200">{t('settings_notif_title')}</h2>
 
@@ -197,33 +191,6 @@ export default function Settings() {
               className={inputCls + ' w-full'}
             />
             <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">{t('settings_threshold_hint_70')}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="scheduler-enabled"
-              checked={schedulerEnabled}
-              onChange={(e) => setSchedulerEnabled(e.target.checked)}
-              className="w-4 h-4 accent-amber-500 rounded"
-            />
-            <label htmlFor="scheduler-enabled" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              {t('settings_scheduler_enable')}
-            </label>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">{t('settings_scheduler_hour')}</label>
-            <input
-              type="number"
-              min="0"
-              max="23"
-              value={schedulerHour}
-              onChange={(e) => setSchedulerHour(e.target.value)}
-              className="w-16 border border-slate-200 dark:border-zinc-700 bg-white/80 dark:bg-zinc-800/80 text-slate-900 dark:text-slate-100 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
-            <span className="text-sm text-slate-500 dark:text-slate-400">:00</span>
           </div>
         </div>
 

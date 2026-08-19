@@ -17,16 +17,15 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.app.database import init_db
-from backend.app.scheduler import start_scheduler, stop_scheduler
 from backend.app.routers import jobs, profile, settings, notifications, scrapers, dashboard, files, ats, applications, analytics
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 附录 F.8 TASK-A01: 不再有常驻定时调度，抓取全部手动触发
+    # （/api/notifications/trigger-scout），见 DECISIONS.md F-CONF-02。
     init_db()
-    start_scheduler()
     yield
-    stop_scheduler()
 
 
 app = FastAPI(

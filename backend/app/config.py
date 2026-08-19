@@ -24,10 +24,6 @@ NOTIFICATION_CHAT_ID: str = os.environ.get("NOTIFICATION_CHAT_ID", "")
 HIGH_SCORE_THRESHOLD: float = float(os.environ.get("HIGH_SCORE_THRESHOLD", "0.80"))
 MID_SCORE_THRESHOLD: float = float(os.environ.get("MID_SCORE_THRESHOLD", "0.70"))
 
-# Scheduler
-SCHEDULER_HOUR: int = int(os.environ.get("SCHEDULER_HOUR", "9"))
-SCHEDULER_MINUTE: int = int(os.environ.get("SCHEDULER_MINUTE", "0"))
-SCHEDULER_ENABLED: bool = os.environ.get("SCHEDULER_ENABLED", "true").lower() == "true"
 
 # Scraper defaults
 DEFAULT_MAX_JOBS: int = int(os.environ.get("DEFAULT_MAX_JOBS", "15"))

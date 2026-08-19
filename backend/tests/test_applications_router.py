@@ -9,7 +9,6 @@ def client(tmp_path, monkeypatch):
     db_file = tmp_path / "test.db"
     test_engine = create_engine(f"sqlite:///{db_file}", echo=False)
     monkeypatch.setenv("GEMINI_API_KEY", "test-key-123")
-    monkeypatch.setenv("SCHEDULER_ENABLED", "false")
     monkeypatch.setattr("backend.app.database.engine", test_engine)
 
     from backend.app.models import application, job, resume_version  # noqa: F401

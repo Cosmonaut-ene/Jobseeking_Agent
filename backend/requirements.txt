@@ -4,7 +4,6 @@ sqlmodel>=0.0.22
 python-dotenv>=1.0.0
 google-genai>=1.0.0
 playwright>=1.40.0
-apscheduler>=3.10.0
 pypdf>=4.0.0
 python-docx>=1.1.0
 python-multipart>=0.0.22

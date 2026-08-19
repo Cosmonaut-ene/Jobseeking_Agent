@@ -16,10 +16,6 @@ services:
         sync: false
       - key: NOTIFICATION_CHAT_ID
         sync: false
-      - key: SCHEDULER_ENABLED
-        value: "true"
-      - key: SCHEDULER_HOUR
-        value: "9"
       - key: HIGH_SCORE_THRESHOLD
         value: "0.80"
       - key: MID_SCORE_THRESHOLD

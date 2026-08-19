@@ -66,8 +66,8 @@ def push_high_score_job(job: Job) -> bool:
     return _send(text)
 
 
-def push_daily_summary(stats: dict, high_jobs: list[Job], mid_jobs: list[Job]) -> bool:
-    """Daily summary push."""
+def push_batch_scrape_summary(stats: dict, high_jobs: list[Job], mid_jobs: list[Job]) -> bool:
+    """批量抓取完成摘要——手动触发后推送，不再是"每日定时"的语义（附录 F.8 TASK-A01）。"""
     from datetime import date
     today = date.today().isoformat()
 
@@ -75,7 +75,7 @@ def push_daily_summary(stats: dict, high_jobs: list[Job], mid_jobs: list[Job]) -
     linkedin_count = stats.get("linkedin", 0)
 
     text = (
-        f"📊 <b>今日岗位报告 ({today})</b>\n\n"
+        f"📊 <b>批量抓取完成报告 ({today})</b>\n\n"
         f"🔍 爬取统计:\n"
         f"   • Seek: {seek_count} 个新职位\n"
         f"   • LinkedIn: {linkedin_count} 个新职位\n\n"

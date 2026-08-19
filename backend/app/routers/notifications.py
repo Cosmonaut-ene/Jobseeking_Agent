@@ -30,12 +30,12 @@ def trigger_scout() -> dict:
 
     def _run():
         try:
-            from backend.app.scrapers.scheduler import run_daily_scout
+            from backend.app.scrapers.batch_scrape import run_batch_scrape
             settings_file = Path("data/settings.json")
             settings: dict = {}
             if settings_file.exists():
                 settings = json.loads(settings_file.read_text()).get("scraper_config", {})
-            result = run_daily_scout(settings)
+            result = run_batch_scrape(settings)
             _tasks[task_id].update(status="done", progress="Complete", result=result)
         except Exception as e:
             _tasks[task_id].update(status="error", progress=str(e), error=str(e))

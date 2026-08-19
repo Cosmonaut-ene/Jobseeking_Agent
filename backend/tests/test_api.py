@@ -13,7 +13,6 @@ def client(tmp_path, monkeypatch):
     """Create a TestClient with test database."""
     db_file = tmp_path / "test.db"
     monkeypatch.setenv("GEMINI_API_KEY", "test-key-123")
-    monkeypatch.setenv("SCHEDULER_ENABLED", "false")  # Disable scheduler in tests
 
     test_engine = create_engine(f"sqlite:///{db_file}", echo=False)
 
@@ -115,7 +114,6 @@ class TestJobsAPI:
         from backend.app.models import job, application, resume_version
         SQLModel.metadata.create_all(test_engine)
         monkeypatch.setattr("backend.app.database.engine", test_engine)
-        monkeypatch.setenv("SCHEDULER_ENABLED", "false")
 
         for router_module in ["backend.app.routers.jobs"]:
             try:
@@ -149,7 +147,6 @@ class TestJobsAPI:
         from backend.app.models import job, application, resume_version
         SQLModel.metadata.create_all(test_engine)
         monkeypatch.setattr("backend.app.database.engine", test_engine)
-        monkeypatch.setenv("SCHEDULER_ENABLED", "false")
         monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
         import importlib
@@ -179,7 +176,6 @@ class TestJobsAPI:
         from backend.app.models import job, application, resume_version
         SQLModel.metadata.create_all(test_engine)
         monkeypatch.setattr("backend.app.database.engine", test_engine)
-        monkeypatch.setenv("SCHEDULER_ENABLED", "false")
         monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
         import importlib
@@ -317,7 +313,6 @@ class TestProfileAPI:
         from backend.app.models import job, application, resume_version
         SQLModel.metadata.create_all(test_engine)
         monkeypatch.setattr("backend.app.database.engine", test_engine)
-        monkeypatch.setenv("SCHEDULER_ENABLED", "false")
 
         from backend.app.main import app
         test_client = TestClient(app, raise_server_exceptions=False)
@@ -371,7 +366,6 @@ class TestProfileAPI:
         from backend.app.models import job, application, resume_version
         SQLModel.metadata.create_all(test_engine)
         monkeypatch.setattr("backend.app.database.engine", test_engine)
-        monkeypatch.setenv("SCHEDULER_ENABLED", "false")
 
         from backend.app.main import app
         test_client = TestClient(app, raise_server_exceptions=False)
@@ -391,7 +385,6 @@ class TestSettingsAPI:
         assert response.status_code == 200
         data = response.json()
         assert "gemini_api_key_set" in data
-        assert "scheduler_enabled" in data
         assert "high_score_threshold" in data
         assert "mid_score_threshold" in data
 
@@ -408,13 +401,6 @@ class TestSettingsAPI:
         data = response.json()
         assert isinstance(data["high_score_threshold"], float)
         assert isinstance(data["mid_score_threshold"], float)
-
-    def test_settings_scheduler_hour_is_int(self, client):
-        """Scheduler hour in settings should be an int."""
-        response = client.get("/api/settings")
-        data = response.json()
-        assert "scheduler_hour" in data
-        assert isinstance(data["scheduler_hour"], int)
 
     def test_settings_notification_webhook_set_false_by_default(self, client):
         """notification_webhook_set should be False when not configured."""

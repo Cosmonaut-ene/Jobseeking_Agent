@@ -9,8 +9,7 @@ class TestConfig:
         from backend.app.config import (
             BASE_DIR, DATA_DIR, DB_PATH, PROFILE_PATH,
             RESUMES_DIR, COVER_LETTERS_DIR, HIGH_SCORE_THRESHOLD,
-            MID_SCORE_THRESHOLD, SCHEDULER_HOUR, SCHEDULER_MINUTE,
-            DEFAULT_MAX_JOBS,
+            MID_SCORE_THRESHOLD, DEFAULT_MAX_JOBS,
         )
         assert isinstance(BASE_DIR, Path)
         assert isinstance(DATA_DIR, Path)
@@ -18,8 +17,6 @@ class TestConfig:
         assert 0.0 < HIGH_SCORE_THRESHOLD <= 1.0
         assert 0.0 < MID_SCORE_THRESHOLD <= 1.0
         assert MID_SCORE_THRESHOLD < HIGH_SCORE_THRESHOLD
-        assert 0 <= SCHEDULER_HOUR <= 23
-        assert 0 <= SCHEDULER_MINUTE <= 59
         assert DEFAULT_MAX_JOBS > 0
 
     def test_base_dir_is_project_root(self):
@@ -57,22 +54,6 @@ class TestConfig:
         from backend.app.config import PROFILE_PATH
         assert PROFILE_PATH.suffix == ".json"
 
-    def test_scheduler_defaults(self):
-        """Test default scheduler values without env overrides."""
-        old_hour = os.environ.pop("SCHEDULER_HOUR", None)
-        old_minute = os.environ.pop("SCHEDULER_MINUTE", None)
-        try:
-            import importlib
-            import backend.app.config as cfg
-            importlib.reload(cfg)
-            assert cfg.SCHEDULER_HOUR == 9
-            assert cfg.SCHEDULER_MINUTE == 0
-        finally:
-            if old_hour:
-                os.environ["SCHEDULER_HOUR"] = old_hour
-            if old_minute:
-                os.environ["SCHEDULER_MINUTE"] = old_minute
-
     def test_default_max_jobs_default(self):
         """Test DEFAULT_MAX_JOBS default value."""
         old_val = os.environ.pop("DEFAULT_MAX_JOBS", None)
@@ -96,18 +77,6 @@ class TestConfig:
         finally:
             if old_val:
                 os.environ["GEMINI_API_KEY"] = old_val
-
-    def test_scheduler_enabled_default_true(self):
-        """SCHEDULER_ENABLED should default to True."""
-        old_val = os.environ.pop("SCHEDULER_ENABLED", None)
-        try:
-            import importlib
-            import backend.app.config as cfg
-            importlib.reload(cfg)
-            assert cfg.SCHEDULER_ENABLED is True
-        finally:
-            if old_val:
-                os.environ["SCHEDULER_ENABLED"] = old_val
 
     def test_notification_webhook_default_empty(self):
         """NOTIFICATION_WEBHOOK_URL should default to empty string."""

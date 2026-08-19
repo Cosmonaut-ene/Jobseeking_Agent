@@ -48,7 +48,6 @@ def _patch_production_db(tmp_path, monkeypatch) -> None:
     prod_engine = create_engine(f"sqlite:///{tmp_path / 'prod.db'}", echo=False)
     monkeypatch.setattr("backend.app.database.engine", prod_engine)
     monkeypatch.setattr("backend.app.database.DB_PATH", tmp_path / "prod.db")
-    monkeypatch.setenv("SCHEDULER_ENABLED", "false")
     from backend.app.models import application, job, resume_version  # noqa: F401
     SQLModel.metadata.create_all(prod_engine)
 
