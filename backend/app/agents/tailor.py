@@ -7,7 +7,9 @@ Tailor Agent — 根据 JD 定制简历。
 """
 
 import json
+import logging
 import os
+import re
 
 from google import genai
 from google.genai import types
@@ -15,6 +17,11 @@ from google.genai import types
 from backend.app.models.job import Job
 from backend.app.models.resume_version import ResumeVersion
 from backend.app.models.user_profile import UserProfile
+
+_logger = logging.getLogger(__name__)
+
+# 匹配数字（含百分比、货币、倍数等），用于检测 rewritten 中新增的数字
+_NUMBER_RE = re.compile(r"\b\d+\.?\d*\s*[%xk$+]?\b")
 
 MODEL = "gemini-2.5-flash"
 
@@ -83,6 +90,17 @@ class TailorAgent:
         result = self._tailor(job, user_profile)
         ats_score = self._eval_ats_score(result, job.raw_jd) / 100
 
+        # Post-process: detect numbers added by LLM that aren't in source_raw
+        validation_warnings = _validate_bullets(result)
+        changes_summary = result["changes_summary"]
+        if validation_warnings:
+            warning_block = "\n\n[VALIDATION WARNINGS]\n" + "\n".join(
+                f"- {w}" for w in validation_warnings
+            )
+            changes_summary += warning_block
+            for w in validation_warnings:
+                _logger.warning("Tailor fabrication check: %s", w)
+
         content_json = {
             "name": user_profile.name,
             "summary": result["summary"],
@@ -104,7 +122,7 @@ class TailorAgent:
             job_id=job.id,
             content_json=content_json,
             ats_score=ats_score,
-            changes_summary=result["changes_summary"],
+            changes_summary=changes_summary,
         )
 
     def _tailor(self, job: Job, user_profile: UserProfile) -> dict:
@@ -162,3 +180,30 @@ class TailorAgent:
             ),
         )
         return json.loads(response.text).get("ats_pct", 0)
+
+
+def _validate_bullets(tailored: dict) -> list[str]:
+    """检测 rewritten bullet 中是否出现 source_raw 没有的数字。
+
+    LLM 被要求不捏造数据，但这个约束只在 prompt 层面。此函数在代码层面做
+    一次后处理校验：提取 rewritten 和 source_raw 中的数字，若 rewritten 出现
+    了 source_raw 中没有的数字，则视为疑似幻觉并记录 warning。
+
+    不阻断主流程——仅返回警告描述列表，由调用方决定如何处理。
+    """
+    warnings: list[str] = []
+    for project in tailored.get("tailored_projects", []):
+        project_name = project.get("name", "unknown")
+        for bullet in project.get("bullets", []):
+            rewritten: str = bullet.get("rewritten", "")
+            source_raw: str = bullet.get("source_raw", "")
+
+            new_numbers = set(_NUMBER_RE.findall(rewritten))
+            src_numbers = set(_NUMBER_RE.findall(source_raw))
+            added = new_numbers - src_numbers
+            if added:
+                warnings.append(
+                    f"[{project_name}] numbers {sorted(added)} appear in "
+                    f"rewritten but not in source_raw"
+                )
+    return warnings
