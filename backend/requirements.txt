@@ -12,3 +12,4 @@ beautifulsoup4>=4.12.0
 pytz>=2024.1
 faker>=40.0.0
 snowflake-connector-python>=4.0.0
+mcp>=2.0.0
