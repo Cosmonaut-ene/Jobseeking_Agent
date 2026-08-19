@@ -134,6 +134,42 @@ export interface Skill {
   years: number
 }
 
+// ── GitHub profile sync (SPEC 附录 F.7 TASK-B03) ───────────────────────────────
+// diff 提议 -> 人工逐项确认 -> apply。合并规则跟 Resume.tsx 的 mergeSkills 一致
+// （years 只增不减），这里只负责触发/展示/确认，不在前端重新实现合并逻辑。
+
+export interface SkillDiffEntry {
+  name: string
+  change_type: 'new' | 'years_increase'
+  proposed_years: number
+  current_years: number | null
+  source_repos: string[]
+  first_seen: string
+  last_active: string
+}
+
+export interface GitHubSyncTask {
+  status: 'pending' | 'running' | 'done' | 'error'
+  progress: string
+  diff?: SkillDiffEntry[]
+  error?: string
+}
+
+export async function startGithubSync(username?: string, excludeForks = true): Promise<{ task_id: string }> {
+  const r = await api.post('/api/profile/github-sync', { username: username || null, exclude_forks: excludeForks })
+  return r.data
+}
+
+export async function getGithubSyncTask(taskId: string): Promise<GitHubSyncTask> {
+  const r = await api.get(`/api/profile/github-sync/tasks/${taskId}`)
+  return r.data
+}
+
+export async function applyGithubSync(taskId: string, acceptedSkillNames: string[]): Promise<{ saved: boolean; profile: UserProfile }> {
+  const r = await api.post('/api/profile/github-sync/apply', { task_id: taskId, accepted_skill_names: acceptedSkillNames })
+  return r.data
+}
+
 export interface Bullet {
   raw: string
   tech: string[]
