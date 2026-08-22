@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+from typing import Callable
 
 from google import genai
 from google.genai import types
@@ -95,7 +96,12 @@ class TailorAgent:
             else config.TAILOR_DETERMINISTIC_THRESHOLD
         )
 
-    def run(self, job: Job, user_profile: UserProfile) -> ResumeVersion:
+    def run(
+        self,
+        job: Job,
+        user_profile: UserProfile,
+        on_progress: Callable[[int, int, float], None] | None = None,
+    ) -> ResumeVersion:
         """有界 Evaluator-Optimizer 迭代（SPEC 附录 F.5 TASK-C04）。
 
         生成 → 确定性评分 → 若低于阈值携带缺失关键词反馈重写 → 重新评分，
@@ -107,6 +113,11 @@ class TailorAgent:
         不覆盖历史版本——每轮都是一条新的 ResumeVersion 记录，最终只返回
         deterministic_ats_score 最高的一版，但其余轮次的记录仍保留在数据库里。
         没有已上传的简历文件时无法计算确定性分数，退化为单轮、不迭代。
+
+        on_progress(round_num, max_iterations, deterministic_ats_score) 在每轮
+        持久化后调用一次——单轮耗时约 30~50 秒（2 次 LLM 调用），实测整趟下来
+        可能超过 90 秒，调用方（jobs 路由的后台任务）用它给用户展示实时轮次
+        进度，而不是让按钮停在一个死的 "Tailoring…" 上。
         """
         resume_file = self._find_resume_file()
         versions: list[ResumeVersion] = []
@@ -135,6 +146,10 @@ class TailorAgent:
                 job.id, round_num, self.max_iterations,
                 resume_version.ats_score, resume_version.deterministic_ats_score,
             )
+            if on_progress and resume_file is not None:
+                # 没有已上传简历时算不出确定性分数，此时上报 0% 只会误导用户
+                # 以为真的评了 0 分，不如干脆不报——反正这种情况本来就不迭代。
+                on_progress(round_num, self.max_iterations, resume_version.deterministic_ats_score)
 
             if resume_file is None:
                 break  # 无法算确定性分数，没有反馈依据，不迭代

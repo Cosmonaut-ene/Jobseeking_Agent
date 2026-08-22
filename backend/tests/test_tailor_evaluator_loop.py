@@ -156,6 +156,48 @@ class TestIterationAndBestSelection:
         assert best.ats_report == {"round": 1}
 
 
+class TestProgressCallback:
+    """SPEC/UX 打磨：定制耗时 90+ 秒，前端靠 on_progress 展示真实轮次进度
+    （见 backend/app/routers/jobs.py 的后台任务轮询实现），而不是一个死的
+    "Tailoring…"。"""
+
+    def test_on_progress_called_once_per_round_with_running_totals(self, tmp_path, monkeypatch):
+        agent, engine = _make_agent(tmp_path, monkeypatch, max_iterations=3, threshold=99.0)
+        agent._tailor = MagicMock(return_value=_TAILOR_RESULT)
+        agent._score_deterministically = MagicMock(
+            side_effect=[(50.0, {}, ["Kubernetes"]), (60.0, {}, ["Kubernetes"]), (70.0, {}, ["Kubernetes"])]
+        )
+        calls: list[tuple[int, int, float]] = []
+
+        job = _make_job()
+        agent.run(job, _make_profile(), on_progress=lambda r, m, s: calls.append((r, m, s)))
+
+        assert calls == [(1, 3, 50.0), (2, 3, 60.0), (3, 3, 70.0)]
+
+    def test_on_progress_not_called_when_no_uploaded_resume(self, tmp_path, monkeypatch):
+        """No resume file -> single non-scored round -> no deterministic score to report."""
+        agent, engine = _make_agent(tmp_path, monkeypatch, max_iterations=3, threshold=80.0)
+        agent._tailor = MagicMock(return_value=_TAILOR_RESULT)
+        agent._find_resume_file = MagicMock(return_value=None)
+        calls: list[tuple[int, int, float]] = []
+
+        job = _make_job()
+        agent.run(job, _make_profile(), on_progress=lambda r, m, s: calls.append((r, m, s)))
+
+        assert calls == []
+
+    def test_run_works_without_on_progress_argument(self, tmp_path, monkeypatch):
+        """on_progress must stay optional — existing callers that don't pass it must keep working."""
+        agent, engine = _make_agent(tmp_path, monkeypatch, max_iterations=1, threshold=80.0)
+        agent._tailor = MagicMock(return_value=_TAILOR_RESULT)
+        agent._score_deterministically = MagicMock(return_value=(95.0, {}, []))
+
+        job = _make_job()
+        best = agent.run(job, _make_profile())
+
+        assert best.deterministic_ats_score == 95.0
+
+
 class TestPersistenceAndValidation:
     def test_every_round_persisted_as_separate_row_not_overwritten(self, tmp_path, monkeypatch):
         agent, engine = _make_agent(tmp_path, monkeypatch, max_iterations=2, threshold=99.0)

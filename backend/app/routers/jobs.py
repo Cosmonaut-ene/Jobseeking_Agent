@@ -1,7 +1,11 @@
 """Jobs router."""
+import logging
 import os
+import threading
+import uuid
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.encoders import jsonable_encoder
@@ -18,6 +22,12 @@ from backend.app.models.resume_version import ResumeVersion
 from backend.app.models.user_profile import UserProfile
 
 router = APIRouter(tags=["jobs"])
+_logger = logging.getLogger(__name__)
+
+# 定制简历要跑 2~3 轮 LLM 调用，实测能超过 90 秒，同步返回会让前端只能显示
+# 一个死的 "Tailoring…"。改成跟 scrapers.py / profile.py 一致的"内存任务字典
+# + 后台线程 + 轮询 GET"模式，让每一轮结束都能上报真实进度。
+_tailor_tasks: dict[str, dict[str, Any]] = {}
 
 
 def _require_api_key() -> None:
@@ -121,22 +131,31 @@ def delete_job(job_id: str) -> dict:
     return {"deleted": True}
 
 
-@router.post("/jobs/{job_id}/tailor")
-def tailor_job(job_id: str) -> dict:
-    _require_api_key()
-    profile = _load_profile()
+def _run_tailor(task_id: str, job_id: str) -> None:
+    _tailor_tasks[task_id].update(status="running", progress="Loading job and profile...")
     try:
+        profile = UserProfile.load()
         with Session(engine) as session:
             job = session.get(Job, job_id)
             if not job:
-                raise HTTPException(404, "Job not found")
+                _tailor_tasks[task_id].update(status="error", progress="Job not found", error="Job not found")
+                return
             agent = TailorAgent()
+
+            def on_progress(round_num: int, max_iterations: int, deterministic_score: float) -> None:
+                _tailor_tasks[task_id].update(
+                    status="running",
+                    progress=f"Round {round_num}/{max_iterations} — deterministic {deterministic_score:.0f}%",
+                    round=round_num,
+                    max_iterations=max_iterations,
+                    deterministic_ats_score=deterministic_score,
+                )
+
             # TailorAgent.run() persists every iteration round itself (SPEC 附录 F.5
             # TASK-C04 — 每轮版本均须落库保留，不得覆盖历史版本) and returns the
             # best-scoring, already-committed version. Do not re-add/commit it here.
-            resume_version = agent.run(job, profile)
+            resume_version = agent.run(job, profile, on_progress=on_progress)
             result = jsonable_encoder(resume_version)
-            # Generate PDF
             try:
                 from backend.app.pdf_generator import generate_resume_pdf
                 from backend.app.config import RESUMES_DIR
@@ -145,13 +164,31 @@ def tailor_job(job_id: str) -> dict:
                 generate_resume_pdf(resume_version.content_json or {}, profile, template_path, output_path)
                 result["pdf_download_url"] = f"/api/files/{job_id}/resume.pdf"
             except Exception as pdf_err:
-                import logging
-                logging.getLogger(__name__).warning("PDF generation failed: %s", pdf_err)
-            return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(500, detail=str(e))
+                _logger.warning("PDF generation failed: %s", pdf_err)
+            _tailor_tasks[task_id].update(status="done", progress="Done", result=result)
+    except Exception as exc:
+        _tailor_tasks[task_id].update(status="error", progress=str(exc), error=str(exc))
+
+
+@router.post("/jobs/{job_id}/tailor")
+def tailor_job(job_id: str) -> dict:
+    _require_api_key()
+    _load_profile()  # 提前校验 profile 存在，避免开了任务才发现失败
+    with Session(engine) as session:
+        job = session.get(Job, job_id)
+        if not job:
+            raise HTTPException(404, "Job not found")
+    task_id = str(uuid.uuid4())
+    _tailor_tasks[task_id] = {"status": "pending", "progress": "Queued"}
+    threading.Thread(target=_run_tailor, args=(task_id, job_id), daemon=True).start()
+    return {"task_id": task_id}
+
+
+@router.get("/jobs/{job_id}/tailor/tasks/{task_id}")
+def get_tailor_task(job_id: str, task_id: str) -> dict:
+    if task_id not in _tailor_tasks:
+        raise HTTPException(404, "Task not found")
+    return _tailor_tasks[task_id]
 
 
 @router.get("/jobs/{job_id}/cover-letter")

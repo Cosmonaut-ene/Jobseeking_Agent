@@ -97,6 +97,29 @@ export async function simulateAts(resumeVersionId: string): Promise<AtsSimulatio
   return r.data
 }
 
+// ── Tailor Resume as a background task (UX 打磨: 单趟耗时可超过 90 秒，
+// 需要按轮次展示真实进度，而不是一个死的 "Tailoring…") ────────────────────────
+
+export interface TailorTask {
+  status: 'pending' | 'running' | 'done' | 'error'
+  progress: string
+  round?: number
+  max_iterations?: number
+  deterministic_ats_score?: number
+  result?: ResumeVersion & { pdf_download_url?: string }
+  error?: string
+}
+
+export async function startTailor(jobId: string): Promise<{ task_id: string }> {
+  const r = await api.post(`/api/jobs/${jobId}/tailor`)
+  return r.data
+}
+
+export async function getTailorTask(jobId: string, taskId: string): Promise<TailorTask> {
+  const r = await api.get(`/api/jobs/${jobId}/tailor/tasks/${taskId}`)
+  return r.data
+}
+
 // ready(AI 已备好) -> applied(人类已投递) -> responded/interview/rejected
 // 见 SPEC 附录 F.6 TASK-D01；流转规则由后端 APPLICATION_STATUS_TRANSITIONS 强制。
 export type ApplicationStatus = 'ready' | 'applied' | 'responded' | 'interview' | 'rejected'
