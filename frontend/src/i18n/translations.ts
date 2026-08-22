@@ -232,7 +232,7 @@ export const translations = {
     settings_production_title: 'Production deployment',
     settings_production_desc_pre: 'On Render.com, set',
     settings_production_desc_post: 'as an environment variable. The Settings page is for demo / testing without redeploying.',
-    settings_notif_title: 'Notifications & Scheduler',
+    settings_notif_title: 'Notifications',
     settings_webhook_label: 'Notification Webhook URL',
     settings_chat_id_label: 'Notification Chat ID',
     settings_high_threshold: 'High Score Threshold',
@@ -245,8 +245,8 @@ export const translations = {
 
     // Notifications page
     notif_title: 'Notifications & Auto Scraping',
-    notif_trigger_title: 'Manual Trigger Daily Scraping',
-    notif_trigger_desc: 'Manually run full scraping (Seek + Indeed + LinkedIn) and send notification pushes. System runs automatically at 9:00 AM daily.',
+    notif_trigger_title: 'Manual Trigger Scraping',
+    notif_trigger_desc: 'Manually run full scraping (Seek + LinkedIn) and send notification pushes. There is no automatic schedule — this only runs when you click the button.',
     notif_scraping: 'Scraping…',
     notif_run_now: 'Run Scraping Now',
     notif_stats_label: 'Scraping Stats',
@@ -550,7 +550,7 @@ export const translations = {
     settings_production_title: '生产环境部署',
     settings_production_desc_pre: '在 Render.com 上，将',
     settings_production_desc_post: '设置为环境变量。设置页面仅用于演示/测试，无需重新部署。',
-    settings_notif_title: '通知 & 调度器',
+    settings_notif_title: '通知',
     settings_webhook_label: '通知 Webhook URL',
     settings_chat_id_label: '通知 Chat ID',
     settings_high_threshold: '高分阈值',
@@ -563,8 +563,8 @@ export const translations = {
 
     // Notifications page
     notif_title: '通知 & 自动爬取',
-    notif_trigger_title: '手动触发每日爬取',
-    notif_trigger_desc: '手动执行全量爬取（Seek + Indeed + LinkedIn），并发送通知推送。系统每天 9:00 AM 自动执行。',
+    notif_trigger_title: '手动触发爬取',
+    notif_trigger_desc: '手动执行全量爬取（Seek + LinkedIn），并发送通知推送。没有自动定时任务——只有点击按钮才会运行。',
     notif_scraping: '爬取中…',
     notif_run_now: '立即执行爬取',
     notif_stats_label: '爬取统计',

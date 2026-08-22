@@ -7,7 +7,7 @@ interface TaskResult {
   status: string
   progress: string
   result?: {
-    scraped: { seek: number; indeed: number; linkedin: number }
+    scraped: { seek: number; linkedin: number }
     saved: number
     high_score: number
     mid_score: number
@@ -93,7 +93,6 @@ export default function Notifications() {
                   <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">{t('notif_stats_label')}</div>
                   <div className="text-sm space-y-0.5 text-slate-700 dark:text-slate-300">
                     <div>Seek: {task.result.scraped.seek}</div>
-                    <div>Indeed: {task.result.scraped.indeed}</div>
                     <div>LinkedIn: {task.result.scraped.linkedin}</div>
                   </div>
                 </div>
