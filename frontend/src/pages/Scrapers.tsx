@@ -38,7 +38,8 @@ function ensurePolling(storageKey: string, taskId: string) {
     listeners: new Set<(s: TaskState) => void>(),
   }
   store.set(storageKey, entry)
-  entry.intervalId = setInterval(async () => {
+
+  async function poll() {
     try {
       const r = await api.get(`/api/tasks/${taskId}`)
       entry.state = r.data
@@ -57,7 +58,13 @@ function ensurePolling(storageKey: string, taskId: string) {
         entry.listeners.forEach(fn => fn(gone))
       }
     }
-  }, 2000)
+  }
+
+  // 立即轮询一次，而不是等第一个 2 秒的 interval tick——否则用户点击 Start
+  // 后有整整 2 秒只能看到本地占位符 "..."，看着像卡住了，其实后端早就有
+  // 真实的阶段性进度文案了（见 routers/scrapers.py 的 _run_seek/_run_linkedin）。
+  poll()
+  entry.intervalId = setInterval(poll, 2000)
 }
 
 function stopPolling(storageKey: string) {
@@ -82,15 +89,21 @@ function usePersistentTask(storageKey: string) {
     const entry = store.get(storageKey)
     if (!entry) return
     setTask(entry.state)
-    const listener = (s: TaskState) => setTask(s)
-    entry.listeners.add(listener)
-    return () => { entry.listeners.delete(listener) }
+    // 用 setTask 本身（而不是一个每次渲染都新建的箭头函数）注册进 listeners，
+    // 这样 startTask() 里用同一个引用再 add 一次时，Set 会去重成同一条——
+    // 否则若这个 effect 因为挂载时 store 里还没有 entry 而提前 return，
+    // 之后 startTask() 建好 entry 时就再也没人订阅了，进度会永远停在点击
+    // 那一刻本地写的占位符 "..." 上，不管后端轮询接口本身进展到哪一步。
+    entry.listeners.add(setTask)
+    return () => { entry.listeners.delete(setTask) }
   }, [storageKey])
 
   const startTask = (taskId: string) => {
     sessionStorage.setItem(storageKey, taskId)
     ensurePolling(storageKey, taskId)
-    setTask({ status: 'running', progress: '...' })
+    const entry = store.get(storageKey)!
+    entry.listeners.add(setTask)
+    setTask(entry.state)
   }
 
   const cancelTask = async () => {
