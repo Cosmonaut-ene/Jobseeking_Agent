@@ -11,6 +11,7 @@ from backend.app.models.application import (
     Application,
     ApplicationStatus,
 )
+from backend.app.models.job import Job, JobStatus
 
 router = APIRouter(tags=["applications"])
 
@@ -36,6 +37,15 @@ def update_status(application_id: str, body: StatusUpdateRequest) -> dict:
 
         application.status = body.status
         session.add(application)
+        # Job.status only becomes "applied" at this exact human-confirmed moment
+        # — not when a cover letter is merely drafted (see routers/jobs.py::
+        # generate_cover_letter). This is the single place the status badge
+        # shown throughout the UI is allowed to say "applied".
+        if body.status == ApplicationStatus.applied:
+            job = session.get(Job, application.job_id)
+            if job:
+                job.status = JobStatus.applied
+                session.add(job)
         session.commit()
         session.refresh(application)
         return jsonable_encoder(application)

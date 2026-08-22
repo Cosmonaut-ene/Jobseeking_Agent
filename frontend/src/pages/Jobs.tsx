@@ -327,7 +327,11 @@ export default function Jobs() {
     setActionLoading('confirm'); setActionMsg('')
     try {
       const updated = await confirmApplicationApplied(applicationId)
-      setSelected(j => j ? { ...j, application: updated } : j)
+      // 后端在这一步才会把 Job.status 同步成 "applied"（见 applications 路由的
+      // 修复：以前生成求职信那一刻就提前改了 Job.status，这里没跟着刷新也不会
+      // 露馅；现在时序改对了之后，这里必须跟着更新，否则徽章会停在旧状态上）。
+      setSelected(j => j ? { ...j, application: updated, status: 'applied' } : j)
+      setJobs(prev => prev.map(j => j.id === selected?.id ? { ...j, status: 'applied' } : j))
       setActionMsg(t('jobs_confirm_applied_done')); setActionSuccess(true)
     } catch (e: unknown) {
       setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed')

@@ -229,7 +229,15 @@ def generate_cover_letter(job_id: str) -> dict:
             agent = CoverLetterAgent()
             subject, body = agent.generate(job, rv, profile)
             path = agent.save(job, subject, body)
-            # Record application
+            # Record application — status stays at its default (ready): drafting a
+            # cover letter is not the same as actually submitting it. Job.status
+            # must NOT flip to "applied" here — that used to happen and made the
+            # status badge lie the instant this endpoint ran, well before the
+            # human ever touched the actual job board. Job.status only becomes
+            # "applied" when Application.status does, via the human-confirmed
+            # PUT /api/applications/{id}/status transition (SPEC 附录 F.6 TASK-D02,
+            # DECISIONS.md DEC-05 — reminder-only, confirmation always happens
+            # in-app against a specific job, never silently on draft).
             application = Application(
                 job_id=job.id,
                 resume_version_id=rv.id,
@@ -237,8 +245,6 @@ def generate_cover_letter(job_id: str) -> dict:
                 follow_up_date=date.today() + timedelta(days=7),
             )
             session.add(application)
-            job.status = JobStatus.applied
-            session.add(job)
             session.commit()
             session.refresh(application)
             return {
