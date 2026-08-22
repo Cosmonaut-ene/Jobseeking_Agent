@@ -48,12 +48,48 @@ def _seed_application(engine, status="ready"):
         return application.id
 
 
+def _job_status(engine, job_id: str) -> str:
+    from backend.app.models.job import Job
+    with Session(engine) as session:
+        return session.get(Job, job_id).status.value
+
+
 class TestStatusTransitions:
     def test_valid_transition_ready_to_applied(self, client):
         app_id = _seed_application(client._test_engine, status="ready")
         resp = client.put(f"/api/applications/{app_id}/status", json={"status": "applied"})
         assert resp.status_code == 200
         assert resp.json()["status"] == "applied"
+
+    def test_confirming_applied_syncs_job_status(self, client):
+        """UX audit bug (see DECISIONS.md): the Job status badge shown across
+        the UI must only say "applied" once the human has actually confirmed
+        submission here — not the instant a cover letter gets drafted."""
+        app_id = _seed_application(client._test_engine, status="ready")
+        with Session(client._test_engine) as session:
+            from backend.app.models.application import Application
+            job_id = session.get(Application, app_id).job_id
+
+        resp = client.put(f"/api/applications/{app_id}/status", json={"status": "applied"})
+
+        assert resp.status_code == 200
+        assert _job_status(client._test_engine, job_id) == "applied"
+
+    def test_transition_that_isnt_applied_leaves_job_status_untouched(self, client):
+        app_id = _seed_application(client._test_engine, status="applied")
+        with Session(client._test_engine) as session:
+            from backend.app.models.application import Application
+            job_id = session.get(Application, app_id).job_id
+            from backend.app.models.job import Job, JobStatus
+            job = session.get(Job, job_id)
+            job.status = JobStatus.reviewed  # something other than "applied", to detect any overwrite
+            session.add(job)
+            session.commit()
+
+        resp = client.put(f"/api/applications/{app_id}/status", json={"status": "interview"})
+
+        assert resp.status_code == 200
+        assert _job_status(client._test_engine, job_id) == "reviewed"
 
     @pytest.mark.parametrize("next_status", ["responded", "interview", "rejected"])
     def test_valid_transitions_from_applied(self, client, next_status):
