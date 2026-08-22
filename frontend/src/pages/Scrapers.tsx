@@ -3,6 +3,7 @@ import { Search, Play, Loader2 } from 'lucide-react'
 import { api } from '../api/client'
 import type { Job } from '../api/client'
 import EvaluationReport from '../components/EvaluationReport'
+import IndeterminateProgress from '../components/IndeterminateProgress'
 import { useT } from '../contexts/LanguageContext'
 
 interface TaskState {
@@ -252,13 +253,14 @@ export default function Scrapers() {
             {jdLoading ? t('scrapers_analysing') : t('scrapers_analyse_btn')}
           </button>
         </div>
+        <IndeterminateProgress active={jdLoading} label={t('scrapers_analysing')} />
         {jdError && <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{jdError}</p>}
         {jdResult && (
           <div className="mt-5 space-y-3">
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-semibold text-slate-900 dark:text-slate-100">{jdResult.title}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{jdResult.company}{jdResult.location ? ` · ${jdResult.location}` : ''}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{jdResult.company || t('jobs_no_company')}{jdResult.location ? ` · ${jdResult.location}` : ''}</p>
               </div>
               <span className={`text-sm font-bold ${jdResult.match_score >= 0.7 ? 'text-emerald-700 dark:text-emerald-400' : jdResult.match_score >= 0.4 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
                 {Math.round(jdResult.match_score * 100)}%

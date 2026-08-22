@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import type { Job } from '../api/client'
 import EvaluationReport from '../components/EvaluationReport'
+import IndeterminateProgress from '../components/IndeterminateProgress'
 import { useT } from '../contexts/LanguageContext'
 
 function ScoreBar({ score }: { score: number }) {
@@ -79,6 +80,7 @@ export default function Scout() {
           </button>
         </div>
 
+        <IndeterminateProgress active={loading} label={t('scout_analysing')} />
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       </div>
 
@@ -88,7 +90,7 @@ export default function Scout() {
           <div className="flex items-start justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900">{result.title}</h2>
-              <p className="text-gray-500 text-sm">{result.company}{result.location ? ` · ${result.location}` : ''}</p>
+              <p className="text-gray-500 text-sm">{result.company || t('jobs_no_company')}{result.location ? ` · ${result.location}` : ''}</p>
               {result.salary_range && <p className="text-sm text-gray-500 mt-0.5">{result.salary_range}</p>}
             </div>
             <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
