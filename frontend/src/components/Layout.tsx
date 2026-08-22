@@ -25,16 +25,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar — always dark */}
+      {/* Sidebar — always dark. Collapses to an icon-only rail below md:
+          this app has no mobile-first target (it's headed for a desktop
+          package, per SPEC 附录 F.8), so a full slide-out drawer would be
+          more machinery than the payoff justifies — but the fixed 208px
+          rail was eating over half of a phone-width viewport with no
+          way to shrink it at all, which was a real problem on its own. */}
       <aside
-        className="w-52 flex flex-col shrink-0 border-r border-white/[0.06]"
+        className="w-16 md:w-52 flex flex-col shrink-0 border-r border-white/[0.06]"
         style={{ background: 'linear-gradient(180deg, #27272a 0%, #18181b 45%, #0f0f11 100%)' }}
       >
         {/* Brand */}
-        <div className="px-4 py-5 border-b border-white/[0.07]">
-          <div className="flex items-center gap-2.5">
+        <div className="px-2 md:px-4 py-5 border-b border-white/[0.07]">
+          <div className="flex items-center justify-center md:justify-start gap-2.5">
             <div className="w-1.5 h-5 rounded-full bg-amber-400 shrink-0 shadow-[0_0_8px_rgba(251,191,36,0.5)]" />
-            <div>
+            <div className="hidden md:block">
               <h1 className="text-sm font-semibold text-white leading-tight tracking-tight">{t('appName')}</h1>
               <p className="text-[10px] text-zinc-500 mt-0.5">{t('appSubtitle')}</p>
             </div>
@@ -44,18 +49,18 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-px">
           {NAV_ITEMS.map(({ to, key, Icon }) => (
-            <NavLink key={to} to={to} end={to === '/'}>
+            <NavLink key={to} to={to} end={to === '/'} title={t(key)}>
               {({ isActive }) => (
-                <div className={`flex items-center gap-2.5 px-2.5 py-[7px] rounded-lg text-sm transition-all duration-150 ${
+                <div className={`flex items-center justify-center md:justify-start gap-2.5 px-2.5 py-[7px] rounded-lg text-sm transition-all duration-150 ${
                   isActive
                     ? 'bg-white/[0.09] text-amber-300 font-medium'
                     : 'text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200'
                 }`}>
-                  <span className={`w-[3px] h-3.5 rounded-full shrink-0 transition-all duration-200 ${
+                  <span className={`hidden md:block w-[3px] h-3.5 rounded-full shrink-0 transition-all duration-200 ${
                     isActive ? 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.6)]' : 'bg-zinc-700'
                   }`} />
-                  <Icon size={14} strokeWidth={isActive ? 2 : 1.6} className="shrink-0" />
-                  {t(key)}
+                  <Icon size={16} strokeWidth={isActive ? 2 : 1.6} className="shrink-0" />
+                  <span className="hidden md:inline">{t(key)}</span>
                 </div>
               )}
             </NavLink>
@@ -63,8 +68,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* Footer */}
-        <div className="px-3 py-3 border-t border-white/[0.07] flex items-center justify-between">
-          <span className="text-[10px] text-zinc-600">v1.0.0</span>
+        <div className="px-3 py-3 border-t border-white/[0.07] flex flex-col md:flex-row items-center justify-between gap-1.5">
+          <span className="hidden md:inline text-[10px] text-zinc-600">v1.0.0</span>
           <div className="flex items-center gap-1.5">
             {/* Theme toggle */}
             <button
