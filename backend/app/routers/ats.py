@@ -46,7 +46,11 @@ def simulate(req: SimulateRequest) -> dict:
 
         ats_keywords = (job.gap_analysis or {}).get("resume_improvements", {}).get("ats_keywords", [])
         resume_text = flatten_resume_version_text(resume_version.content_json or {})
-        llm_ats_pct = job.match_score * 100 if job.match_score else None
+        # 用这一版简历自己的 AI 自评分做差异诊断，而不是 job.match_score
+        # （那是投递前 JD 层面的匹配度，跟这份已经改写过的简历无关）——
+        # 前端并排展示的正是 resume_version.ats_score vs deterministic_ats_score，
+        # 诊断必须针对这两个数字，否则永远对不上用户在页面上看到的差距。
+        llm_ats_pct = resume_version.ats_score * 100
 
         report = simulate_ats(
             resume_file_path=resume_file,
