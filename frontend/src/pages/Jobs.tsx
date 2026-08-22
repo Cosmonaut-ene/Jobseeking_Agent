@@ -357,16 +357,21 @@ export default function Jobs() {
   })
 
   return (
-    <div className="flex gap-4" style={{ height: 'calc(100vh - 3rem)' }}>
+    // 平板/窄屏下改成上下堆叠而不是并排——之前固定并排布局在 768px 宽度下，
+    // 右侧详情栏在未选中任何职位时会留一大片空白空转，且两栏都不会跟着变窄
+    // 重排（见 UX 走查 #11）。768px 正好卡在 Tailwind 的 md 断点上，用 md:
+    // 的话这个宽度会被当成"桌面"直接维持原样，所以这里用 lg（1024px）——
+    // 让平板宽度也走堆叠布局，只有真正的桌面宽度才用原来的定高双栏。
+    <div className="flex flex-col lg:flex-row gap-4 lg:h-[calc(100vh-3rem)]">
       {/* Left: job list */}
-      <div className="w-72 flex flex-col shrink-0">
+      <div className="w-full lg:w-72 flex flex-col shrink-0">
         <div className="mb-3 space-y-2">
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('jobs_search_placeholder')} className="input-field w-full" />
           <select value={filter} onChange={e => setFilter(e.target.value)} className="input-field w-full">
             {STATUSES.map(s => <option key={s} value={s}>{s === 'all' ? t('jobs_all_statuses') : s}</option>)}
           </select>
         </div>
-        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
+        <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[50vh] lg:max-h-none">
           {loading && <p className="text-sm text-slate-400 dark:text-zinc-500 text-center mt-4">{t('jobs_loading')}</p>}
           {!loading && filtered.length === 0 && <p className="text-sm text-slate-400 dark:text-zinc-500 text-center mt-4">{t('jobs_none_found')}</p>}
           {filtered.map(job => <JobCard key={job.id} job={job} selected={selected?.id === job.id} onClick={() => selectJob(job)} />)}
