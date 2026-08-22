@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api/client'
 import type { Education, Experience, Project, Skill, UserProfile } from '../api/client'
 import { useT } from '../contexts/LanguageContext'
@@ -48,6 +48,14 @@ export default function Resume() {
   const [savedMsg, setSavedMsg] = useState('')
   const [savedSuccess, setSavedSuccess] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // 之前这个页面完全不显示已保存的 profile 状态——哪怕 Profile 页里已经有
+  // 69 项技能，用户打开这里也完全看不出来，只能跳去别处确认（见 UX 走查）。
+  const [savedProfile, setSavedProfile] = useState<UserProfile | null>(null)
+  const [savedProfileLoading, setSavedProfileLoading] = useState(true)
+
+  useEffect(() => {
+    api.get('/api/profile').then(r => setSavedProfile(r.data)).catch(() => {}).finally(() => setSavedProfileLoading(false))
+  }, [])
 
   async function parse() {
     setParsing(true)
@@ -118,6 +126,7 @@ export default function Resume() {
       }
 
       await api.put('/api/profile', merged)
+      setSavedProfile(merged)
       setSavedMsg(t('resume_saved_msg'))
       setSavedSuccess(true)
     } catch (e: unknown) {
@@ -132,7 +141,21 @@ export default function Resume() {
   return (
     <div className="max-w-3xl">
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('resume_title')}</h1>
-      <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{t('resume_description')}</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t('resume_description')}</p>
+
+      {!savedProfileLoading && (
+        <div className="mb-6 px-4 py-2.5 rounded-lg glass-section border border-slate-200/60 dark:border-zinc-700/60 text-sm text-slate-600 dark:text-slate-300">
+          {savedProfile ? (
+            <>
+              {t('resume_current_saved')} {savedProfile.skills?.length ?? 0} {t('resume_stat_skills')}
+              {' · '}{savedProfile.experience?.length ?? 0} {t('resume_stat_experience')}
+              {' · '}{savedProfile.projects?.length ?? 0} {t('resume_stat_projects')}
+            </>
+          ) : (
+            t('resume_no_saved_profile')
+          )}
+        </div>
+      )}
 
       <div className="glass-card overflow-hidden">
         {/* Tabs */}

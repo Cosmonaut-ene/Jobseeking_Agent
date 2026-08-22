@@ -164,6 +164,11 @@ export const translations = {
     // Resume
     resume_title: 'Resume Parser',
     resume_description: 'Upload your resume or paste the text — the AI will extract a structured profile. Then save it to use across Scout, Tailor, and Apply.',
+    resume_current_saved: 'Currently saved:',
+    resume_stat_skills: 'skills',
+    resume_stat_experience: 'experience entries',
+    resume_stat_projects: 'projects',
+    resume_no_saved_profile: 'No profile saved yet — paste or upload your resume below to get started.',
     resume_tab_paste: 'Paste Text',
     resume_tab_upload: 'Upload File',
     resume_paste_placeholder: 'Paste your resume text here…',
@@ -244,7 +249,7 @@ export const translations = {
     settings_key_saved: 'API key saved for this session.',
 
     // Notifications page
-    notif_title: 'Notifications & Auto Scraping',
+    notif_title: 'Notifications & Manual Scraping',
     notif_trigger_title: 'Manual Trigger Scraping',
     notif_trigger_desc: 'Manually run full scraping (Seek + LinkedIn) and send notification pushes. There is no automatic schedule — this only runs when you click the button.',
     notif_scraping: 'Scraping…',
@@ -482,6 +487,11 @@ export const translations = {
     // Resume
     resume_title: '简历解析器',
     resume_description: '上传你的简历或粘贴文本 — AI 将自动提取结构化资料，保存后可在 Scout、定制和申请功能中使用。',
+    resume_current_saved: '当前已保存：',
+    resume_stat_skills: '项技能',
+    resume_stat_experience: '段经历',
+    resume_stat_projects: '个项目',
+    resume_no_saved_profile: '还没有保存过简历信息——在下方粘贴或上传即可开始。',
     resume_tab_paste: '粘贴文本',
     resume_tab_upload: '上传文件',
     resume_paste_placeholder: '在此粘贴简历文本…',
@@ -562,7 +572,7 @@ export const translations = {
     settings_key_saved: 'API Key 已保存（本次会话有效）。',
 
     // Notifications page
-    notif_title: '通知 & 自动爬取',
+    notif_title: '通知 & 手动爬取',
     notif_trigger_title: '手动触发爬取',
     notif_trigger_desc: '手动执行全量爬取（Seek + LinkedIn），并发送通知推送。没有自动定时任务——只有点击按钮才会运行。',
     notif_scraping: '爬取中…',
