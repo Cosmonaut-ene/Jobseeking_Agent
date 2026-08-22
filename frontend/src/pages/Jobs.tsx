@@ -383,7 +383,7 @@ export default function Jobs() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">{selected.title || t('jobs_untitled')}</h2>
-                  <p className="text-slate-500 dark:text-slate-400">{selected.company}{selected.location ? ` · ${selected.location}` : ''}</p>
+                  <p className="text-slate-500 dark:text-slate-400">{selected.company || t('jobs_no_company')}{selected.location ? ` · ${selected.location}` : ''}</p>
                   {selected.salary_range && <p className="text-sm text-slate-400 dark:text-zinc-500 mt-0.5">{selected.salary_range}</p>}
                   {selected.source_url && (
                     <a href={selected.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-amber-600 dark:text-amber-400 hover:underline">

@@ -258,7 +258,7 @@ export default function Scrapers() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-semibold text-slate-900 dark:text-slate-100">{jdResult.title}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{jdResult.company}{jdResult.location ? ` · ${jdResult.location}` : ''}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{jdResult.company || t('jobs_no_company')}{jdResult.location ? ` · ${jdResult.location}` : ''}</p>
               </div>
               <span className={`text-sm font-bold ${jdResult.match_score >= 0.7 ? 'text-emerald-700 dark:text-emerald-400' : jdResult.match_score >= 0.4 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
                 {Math.round(jdResult.match_score * 100)}%

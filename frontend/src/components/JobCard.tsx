@@ -1,4 +1,5 @@
 import type { Job } from '../api/client'
+import { useT } from '../contexts/LanguageContext'
 
 const STATUS_COLORS: Record<string, string> = {
   new:       'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function JobCard({ job, selected, onClick }: Props) {
+  const t = useT()
   return (
     <div
       onClick={onClick}
@@ -35,7 +37,7 @@ export default function JobCard({ job, selected, onClick }: Props) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="font-medium text-sm text-slate-900 dark:text-slate-100 truncate">{job.title || 'Untitled'}</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{job.company}{job.location ? ` · ${job.location}` : ''}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{job.company || t('jobs_no_company')}{job.location ? ` · ${job.location}` : ''}</p>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <span className={`px-1.5 py-0.5 rounded-md text-xs font-medium ${STATUS_COLORS[job.status] ?? 'bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400'}`}>
