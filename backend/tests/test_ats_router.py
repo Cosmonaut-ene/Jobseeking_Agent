@@ -109,3 +109,47 @@ class TestSimulateEndpoint:
             rv = session.get(ResumeVersion, rv_id)
             assert rv.deterministic_ats_score == body["deterministic_ats_score"]
             assert rv.ats_report != {}
+
+    def test_diagnosis_compares_against_this_versions_ats_score_not_job_match_score(self, client, monkeypatch, tmp_path):
+        """Regression: the diagnosis explaining a gap between the AI estimate and
+        the deterministic score must be computed against resume_version.ats_score
+        (what the UI actually shows next to the deterministic score), not
+        job.match_score (the pre-tailoring JD match, a different number the UI
+        doesn't display alongside it)."""
+        import backend.app.routers.ats as ats_module
+        from backend.app.models.job import Job
+        from backend.app.models.resume_version import ResumeVersion
+
+        with Session(ats_module.engine) as session:
+            job = Job(
+                source="manual", raw_jd="Looking for a Kubernetes engineer",
+                title="Engineer", company="Acme",
+                match_score=0.90,  # close to the deterministic score below — would mask the bug
+                gap_analysis={"resume_improvements": {"ats_keywords": ["Kubernetes"]}},
+            )
+            session.add(job)
+            session.commit()
+            session.refresh(job)
+            rv = ResumeVersion(
+                job_id=job.id,
+                content_json={"summary": "Kubernetes expert", "skills": ["Kubernetes"], "projects": [], "experience": []},
+                ats_score=0.82,  # far from the deterministic score below — should trigger diagnosis
+            )
+            session.add(rv)
+            session.commit()
+            session.refresh(rv)
+            rv_id = rv.id
+
+        from docx import Document
+        doc = Document()
+        doc.add_paragraph("An unrelated resume with none of the target keywords.")
+        doc.save(ats_module.RESUMES_DIR / "resume.docx")
+
+        resp = client.post("/api/ats/simulate", json={"resume_version_id": rv_id})
+
+        assert resp.status_code == 200
+        body = resp.json()
+        # deterministic score will be low (no keywords matched) — far from 82%,
+        # so diagnosis must be non-empty; it would be empty if the bug used 90%.
+        assert body["deterministic_ats_score"] < 62.0
+        assert body["diagnosis"] != []

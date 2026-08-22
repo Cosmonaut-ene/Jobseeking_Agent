@@ -211,10 +211,19 @@ class TailorAgent:
         )
 
     def _score_deterministically(self, job, user_profile, resume_file, resume_version):
-        """返回 (deterministic_ats_score, ats_report dict, keyword misses)。"""
+        """返回 (deterministic_ats_score, ats_report dict, keyword misses)。
+
+        llm_ats_pct 必须是**这一版定制简历自己的** AI 自评分
+        （resume_version.ats_score，来自 _eval_ats_score），而不是
+        job.match_score（那是投递前 JD 层面的匹配度，跟定制后的简历无关）。
+        前端并排展示给用户看的就是 resume.ats_score vs deterministic_ats_score
+        这两个数——用别的数字去判断"要不要给差异诊断"，诊断永远对不上用户
+        实际看到的那两个数字（曾经导致 82% vs 57% 这种 25 分的差距完全没有
+        任何解释，因为当时比较的是 job.match_score 跟 deterministic 分）。
+        """
         ats_keywords = job.gap_analysis.get("resume_improvements", {}).get("ats_keywords", [])
         resume_text = flatten_resume_version_text(resume_version.content_json)
-        llm_ats_pct = job.match_score * 100 if job.match_score else None
+        llm_ats_pct = resume_version.ats_score * 100
 
         report = simulate_ats(
             resume_file_path=resume_file,

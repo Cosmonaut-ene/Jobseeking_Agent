@@ -4,7 +4,7 @@ import {
   CheckCircle, CheckCircle2, XCircle, Scissors, Download, Mail,
   ExternalLink, ChevronDown, ChevronUp, Copy, Check, Loader2,
 } from 'lucide-react'
-import { api, simulateAts, confirmApplicationApplied } from '../api/client'
+import { api, simulateAts, confirmApplicationApplied, startTailor, getTailorTask } from '../api/client'
 import type { Job, ResumeVersion, AtsSimulationReport } from '../api/client'
 import JobCard from '../components/JobCard'
 import EvaluationReport from '../components/EvaluationReport'
@@ -44,11 +44,14 @@ function CopyBtn({ text }: { text: string }) {
   )
 }
 
+function atsColor(pct: number) {
+  return pct >= 70 ? 'text-emerald-700 dark:text-emerald-400' : pct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+}
+
 function AtsScoreBadge({ label, pct, sourceNote }: { label: string; pct: number; sourceNote?: string }) {
-  const color = pct >= 70 ? 'text-emerald-700 dark:text-emerald-400' : pct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
   return (
     <span className="text-xs text-slate-500 dark:text-slate-400">
-      {label} <strong className={color}>{pct}%</strong>
+      {label} <strong className={atsColor(pct)}>{pct}%</strong>
       {sourceNote && <span className="text-slate-400 dark:text-zinc-500 ml-0.5">{sourceNote}</span>}
     </span>
   )
@@ -79,20 +82,29 @@ function ResumePanel({ resume }: { resume: ResumeVersion }) {
 
   return (
     <div className="glass-card text-sm divide-theme overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 glass-section rounded-t-xl flex-wrap gap-1.5">
+      <div className="flex items-center justify-between px-4 py-2.5 glass-section rounded-t-xl flex-wrap gap-2">
         <span className="font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
           <Scissors size={13} className="text-amber-500" />{t('resume_panel_title')}
         </span>
         <div className="flex items-center gap-3">
-          <AtsScoreBadge label={t('resume_ats_match')} pct={atsPct} sourceNote={t('resume_ats_ai_estimate_note')} />
-          {sim && <AtsScoreBadge label={t('resume_ats_deterministic')} pct={Math.round(sim.deterministic_ats_score)} />}
+          {sim ? (
+            // 确定性引擎是这个产品的核心卖点，作为主展示（大字号）；AI 自评分降级为
+            // 旁边的小字参考——不能让两个打架的数字平起平坐地扔给用户。
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs text-slate-500 dark:text-slate-400">{t('resume_ats_deterministic')}</span>
+              <span className={`text-lg font-bold ${atsColor(sim.deterministic_ats_score)}`}>{Math.round(sim.deterministic_ats_score)}%</span>
+              <AtsScoreBadge label={t('resume_ats_match')} pct={atsPct} sourceNote={t('resume_ats_ai_estimate_note')} />
+            </div>
+          ) : (
+            <AtsScoreBadge label={t('resume_ats_match')} pct={atsPct} sourceNote={t('resume_ats_ai_estimate_note')} />
+          )}
           <button
             onClick={runSimulation}
             disabled={simLoading}
             className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 hover:text-amber-700 dark:hover:text-amber-300 transition-colors disabled:opacity-60"
           >
             {simLoading && <Loader2 size={11} className="animate-spin" />}
-            {simLoading ? t('resume_ats_sim_running') : t('resume_run_ats_sim')}
+            {simLoading ? t('resume_ats_sim_running') : (sim ? t('resume_run_ats_sim_recheck') : t('resume_run_ats_sim'))}
           </button>
         </div>
       </div>
@@ -228,6 +240,7 @@ export default function Jobs() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [actionMsg, setActionMsg] = useState('')
   const [actionSuccess, setActionSuccess] = useState(false)
+  const [tailorProgress, setTailorProgress] = useState<{ round: number; maxIterations: number; score: number } | null>(null)
   const [resume, setResume] = useState<ResumeVersion | null>(null)
   const [coverLetter, setCoverLetter] = useState<string | null>(null)
   const [showJD, setShowJD] = useState(false)
@@ -275,13 +288,39 @@ export default function Jobs() {
   }
 
   async function tailor(jobId: string) {
-    setActionLoading('tailor'); setActionMsg('')
+    setActionLoading('tailor'); setActionMsg(''); setTailorProgress(null)
     try {
-      const r = await api.post(`/api/jobs/${jobId}/tailor`)
-      setResume(r.data); if (r.data.docx_download_url) setDocxUrl(r.data.docx_download_url)
-      setActionMsg(t('jobs_resume_tailored')); setActionSuccess(true)
-    } catch (e: unknown) { setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Tailor failed'); setActionSuccess(false) }
-    finally { setActionLoading(null) }
+      const { task_id } = await startTailor(jobId)
+      await pollTailor(jobId, task_id)
+    } catch (e: unknown) {
+      setActionMsg((e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Tailor failed')
+      setActionSuccess(false)
+      setActionLoading(null)
+    }
+  }
+
+  // 单趟定制耗时可能超过 90 秒（有界迭代循环，每轮 2 次 LLM 调用），
+  // 轮询展示真实轮次/分数，而不是让按钮停在一个死的 "Tailoring…" 上不动。
+  async function pollTailor(jobId: string, taskId: string) {
+    try {
+      const task = await getTailorTask(jobId, taskId)
+      if (task.round != null && task.max_iterations != null) {
+        setTailorProgress({ round: task.round, maxIterations: task.max_iterations, score: task.deterministic_ats_score ?? 0 })
+      }
+      if (task.status === 'done' && task.result) {
+        setResume(task.result); if (task.result.pdf_download_url) setDocxUrl(task.result.pdf_download_url)
+        setActionMsg(t('jobs_resume_tailored')); setActionSuccess(true)
+        setActionLoading(null); setTailorProgress(null)
+      } else if (task.status === 'error') {
+        setActionMsg(task.error ?? 'Tailor failed'); setActionSuccess(false)
+        setActionLoading(null); setTailorProgress(null)
+      } else {
+        setTimeout(() => pollTailor(jobId, taskId), 2000)
+      }
+    } catch {
+      setActionMsg('Tailor failed'); setActionSuccess(false)
+      setActionLoading(null); setTailorProgress(null)
+    }
   }
 
   async function confirmApplied(applicationId: string) {
@@ -396,7 +435,12 @@ export default function Jobs() {
               <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-200/60 dark:border-white/[0.07]">
                 <ActionButton label={t('jobs_approve')} icon={CheckCircle} onClick={() => updateStatus(selected.id, 'reviewed')} loading={actionLoading === 'status'} variant="success" />
                 <ActionButton label={t('jobs_dismiss')} icon={XCircle} onClick={() => updateStatus(selected.id, 'dismissed')} loading={actionLoading === 'status'} variant="danger" />
-                <ActionButton label={actionLoading === 'tailor' ? t('jobs_tailoring') : t('jobs_tailor_btn')} icon={Scissors} onClick={() => tailor(selected.id)} loading={actionLoading === 'tailor'} />
+                <ActionButton
+                  label={actionLoading === 'tailor'
+                    ? (tailorProgress ? `${t('jobs_tailoring')} ${tailorProgress.round}/${tailorProgress.maxIterations} · ${Math.round(tailorProgress.score)}%` : t('jobs_tailoring'))
+                    : t('jobs_tailor_btn')}
+                  icon={Scissors} onClick={() => tailor(selected.id)} loading={actionLoading === 'tailor'}
+                />
                 {docxUrl && (
                   <a href={docxUrl} download className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 transition-colors">
                     <Download size={13} />{t('jobs_download_word')}
