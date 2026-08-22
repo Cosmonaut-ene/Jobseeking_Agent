@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import type { Job } from '../api/client'
 import EvaluationReport from '../components/EvaluationReport'
+import IndeterminateProgress from '../components/IndeterminateProgress'
 import { useT } from '../contexts/LanguageContext'
 
 function ScoreBar({ score }: { score: number }) {
@@ -79,6 +80,7 @@ export default function Scout() {
           </button>
         </div>
 
+        <IndeterminateProgress active={loading} label={t('scout_analysing')} />
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       </div>
 

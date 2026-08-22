@@ -87,4 +87,14 @@
   .divide-theme > * + * {
     border-top: 1px solid var(--divide);
   }
+
+  /* Indeterminate progress bar — for opaque single-call waits with no real
+     percentage to show (see components/IndeterminateProgress.tsx) */
+  @keyframes progress-indeterminate-slide {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+  .progress-indeterminate {
+    animation: progress-indeterminate-slide 1.2s ease-in-out infinite;
+  }
 }

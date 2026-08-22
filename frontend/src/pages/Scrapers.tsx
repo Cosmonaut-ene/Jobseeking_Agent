@@ -3,6 +3,7 @@ import { Search, Play, Loader2 } from 'lucide-react'
 import { api } from '../api/client'
 import type { Job } from '../api/client'
 import EvaluationReport from '../components/EvaluationReport'
+import IndeterminateProgress from '../components/IndeterminateProgress'
 import { useT } from '../contexts/LanguageContext'
 
 interface TaskState {
@@ -252,6 +253,7 @@ export default function Scrapers() {
             {jdLoading ? t('scrapers_analysing') : t('scrapers_analyse_btn')}
           </button>
         </div>
+        <IndeterminateProgress active={jdLoading} label={t('scrapers_analysing')} />
         {jdError && <p className="mt-3 text-sm text-rose-600 dark:text-rose-400">{jdError}</p>}
         {jdResult && (
           <div className="mt-5 space-y-3">
