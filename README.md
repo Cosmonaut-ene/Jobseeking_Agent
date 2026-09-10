@@ -12,7 +12,6 @@ An AI-powered personal job search automation platform. It scrapes job boards dai
 
 ### Job Discovery
 - **Seek.com.au** — Playwright-based scraper with keyword + location + date filters
-- **Indeed.com.au** — Playwright-based scraper with keyword + location + date filters
 - **LinkedIn** — No-login guest API scraper (zero account risk, no cookies required)
 - **Manual entry** — Paste any job description into the Scout page for instant analysis
 - **URL deduplication** — Already-seen jobs are skipped automatically
@@ -39,6 +38,11 @@ Jobs below `MID_SCORE_THRESHOLD` (default 70%) are automatically discarded. Jobs
 - ATS coverage score per tailored version
 - **Download as Word (.docx)** and as **PDF** for direct submission
 
+### GitHub Profile Sync
+- Infers your real tech stack (and years of use per skill) from GitHub activity via GitHub's official remote MCP server — repo languages + dependency-file parsing for *what*, real commit timestamps for *how long* (not an LLM guess)
+- Proposes a reviewable diff against your existing profile; nothing is written until you accept specific entries
+- Reuses the same skill-merge rule as resume re-upload (key by name, years only go up) — one merge policy, not two
+
 ### Cover Letter Generation
 - Auto-generated from your tailored resume + job description
 - 3 short paragraphs, under 250 words, with an email subject line
@@ -46,7 +50,8 @@ Jobs below `MID_SCORE_THRESHOLD` (default 70%) are automatically discarded. Jobs
 - Automatically records an application entry and sets a follow-up reminder 7 days out
 
 ### Application Tracking
-- Status lifecycle: `new → reviewed → applied → interview → offer / rejected / dismissed`
+- Job pipeline stage: `new → reviewed → applied → interview → offer / rejected / dismissed` (free-form, set by the user or automatically flipped to `applied` on application confirmation)
+- Once an application is created, its own status follows an **enforced** state machine — `ready → applied → {responded, interview, rejected}` — illegal transitions are rejected with HTTP 400
 - Per-application notes, channel, and follow-up date
 - Dashboard surfaces overdue follow-ups
 
@@ -150,7 +155,7 @@ cd frontend && npm run dev
 Paste any job description → **Analyse**. The 5-section evaluation report appears with ATS match %, prioritised actions, and missing keywords.
 
 ### Scrape job boards (Scrapers)
-Enter keywords, location, and max results for Seek, Indeed, or LinkedIn. Results matching your thresholds are saved automatically; high-score jobs trigger an instant notification.
+Enter keywords, location, and max results for Seek or LinkedIn. Results matching your thresholds are saved automatically; high-score jobs trigger an instant notification.
 
 ### Review and apply (Jobs)
 - Select a job from the list to open the detail panel
@@ -222,7 +227,8 @@ Branch naming: `feat/`, `fix/`, `chore/`, `refactor/` + short hyphenated descrip
 All data is stored locally in `data/db/jobseeking.db` (SQLite) and `data/user_profile.json`. The only external calls made are:
 
 - **Gemini API** — job description text and your resume profile are sent for AI processing
-- **Job board websites** — Seek, Indeed, LinkedIn (public pages only, no accounts)
+- **Job board websites** — Seek, LinkedIn (public pages only, no accounts)
+- **GitHub MCP (official remote endpoint)** — if configured, your GitHub PAT is used to read public repo metadata for tech-stack profile sync
 - **Your configured webhook** — job title, company, and match score on high-score discoveries
 
 No analytics, no telemetry, no third-party tracking.
